@@ -1,0 +1,28 @@
+[project]
+name = "policyledger"
+version = "0.1.0"
+description = "A Google Cloud–native, fallback-safe RL Policy Marketplace"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.21.0",
+    "gymnasium>=0.29.0",
+]
+
+[project.optional-dependencies]
+cloud = [
+    "tensorflow>=2.10.0",
+    "google-cloud-firestore>=2.0.0",
+    "google-cloud-aiplatform>=1.0.0",
+    "google-cloud-functions>=1.0.0",
+    "firebase-admin>=6.0.0",
+    "google-generativeai>=0.3.0",  # For Gemini API
+]
+local = [
+    "numpy>=1.21.0",
+    "gymnasium>=0.29.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

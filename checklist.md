@@ -11,14 +11,14 @@
 
 ## 🧩 PHASE 1 — IDEA & SCOPE FREEZE (NON-NEGOTIABLE)
 
-* [ ] One-sentence **problem statement** frozen
-* [ ] One-sentence **solution statement** frozen
-* [ ] Demo environment fixed: **Energy Scheduling**
-* [ ] RL type fixed: **Tabular Q-learning**
-* [ ] Edge hardware fixed: **Old phones / laptop**
-* [ ] Ledger definition fixed: **Tamper-evident append-only ledger**
-* [ ] Google-first + fallback strategy approved
-* [ ] No feature additions after this phase
+* [x] One-sentence **problem statement** frozen
+* [x] One-sentence **solution statement** frozen
+* [x] Demo environment fixed: **Energy Scheduling**
+* [x] RL type fixed: **Tabular Q-learning**
+* [x] Edge hardware fixed: **Old phones / laptop**
+* [x] Ledger definition fixed: **Tamper-evident append-only ledger**
+* [x] Google-first + fallback strategy approved
+* [x] No feature additions after this phase
 
 ☠️ If this moves, everything breaks later.
 
@@ -28,29 +28,32 @@
 
 ### Repo & standards
 
-* [ ] Single Git repository
-* [ ] Project name: **PolicyLedger**
-* [ ] README with:
+* [x] Single Git repository
+* [x] Project name: **PolicyLedger**
+* [x] README with:
 
   * Problem (2 lines)
   * Architecture summary
   * Google services used
-* [ ] Python version fixed (3.10+)
-* [ ] Virtual environment created
-* [ ] `requirements.txt` split into:
+* [x] Python version fixed (3.10+)
+* [x] Virtual environment created with `uv`
+* [x] `pyproject.toml` configured with:
 
-  * `requirements-cloud.txt`
-  * `requirements-local.txt`
+  * Main dependencies (core project)
+  * Optional dependency groups: `[project.optional-dependencies]`
+    * `cloud` — Google Cloud services (Firebase, Vertex AI, TensorFlow)
+    * `local` — Local fallback dependencies
 
 ### Folder structure (STRICT)
 
-* [ ] `agent/`
-* [ ] `verifier/`
-* [ ] `ledger/`
-* [ ] `marketplace/`
-* [ ] `consumer/`
-* [ ] `explainability/`
-* [ ] `shared/`
+* [x] `src/agent/`
+* [x] `src/verifier/`
+* [x] `src/ledger/`
+* [x] `src/marketplace/`
+* [x] `src/consumer/`
+* [x] `src/explainability/`
+* [x] `src/shared/`
+* [x] `src/__init__.py`
 
 🧱 Each folder exposes **interfaces**, not concrete logic.
 
@@ -66,7 +69,7 @@
 * [ ] Demand schedule deterministic + seeded
 * [ ] Reward function written **before coding**
 
-### Code checklist (`shared/env.py`)
+### Code checklist (`src/shared/env.py`)
 
 * [ ] `reset()` implemented
 * [ ] `step(action)` implemented
