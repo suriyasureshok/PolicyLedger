@@ -1,278 +1,333 @@
-# ✅ MASTER CHECKLIST — RL POLICY MARKETPLACE PROJECT
+# ✅ MASTER CHECKLIST — **PolicyLedger**
 
----
-# Architecture Overview
-flowchart LR
-
-subgraph A["RL Agent Node (Phone / Laptop)"]
-    E[EnergySlotEnv]
-    RL[RL Trainer]
-    P[Learned Policy]
-    H[Policy Hash]
-    E --> RL
-    RL --> P
-    P --> H
-end
-
-subgraph B["Submission Layer"]
-    API[Submission API]
-end
-
-subgraph C["Verifier Node"]
-    VR[Policy Replay Engine]
-    VE[Deterministic Env]
-    RC[Reward Calculator]
-    VR --> VE
-    VE --> RC
-end
-
-subgraph D["Blockchain Ledger"]
-    BC[(Policy Ledger)]
-end
-
-subgraph E["Marketplace"]
-    RANK[Policy Ranking Engine]
-end
-
-subgraph F["Policy Consumer"]
-    NEW[New Device]
-end
-
-H --> API
-API --> VR
-RC -->|Verified Reward| BC
-BC --> RANK
-RANK -->|Best Policy| NEW
+*A Google Cloud–native, fallback-safe RL Policy Marketplace*
 
 ---
 
-## 🧩 PHASE 0 — IDEA & SCOPE FREEZE (DO THIS ONCE)
-
-- [ ] One-sentence problem statement written and frozen
-- [ ] One-sentence solution statement written and frozen
-- [ ] Demo environment selected: **Energy Scheduling**
-- [ ] RL type fixed: **Tabular Q-learning**
-- [ ] Hardware fixed: **Old phones / laptop**
-- [ ] Blockchain scope fixed: **Local ledger prototype**
-- [ ] No feature additions allowed after this point
-
-☠️ If you skip this phase, scope creep will kill you.
+# 🏗️ ARCHITECTURE OVERVIEW
+![Architecture Diagram](assets/architecture_diagram.png)
 
 ---
 
-## 🧩 PHASE 1 — REPOSITORY & HYGIENE
+## 🧩 PHASE 1 — IDEA & SCOPE FREEZE (NON-NEGOTIABLE)
 
-### Repo setup
+* [ ] One-sentence **problem statement** frozen
+* [ ] One-sentence **solution statement** frozen
+* [ ] Demo environment fixed: **Energy Scheduling**
+* [ ] RL type fixed: **Tabular Q-learning**
+* [ ] Edge hardware fixed: **Old phones / laptop**
+* [ ] Ledger definition fixed: **Tamper-evident append-only ledger**
+* [ ] Google-first + fallback strategy approved
+* [ ] No feature additions after this phase
 
-- [ ] Single Git repo created
-- [ ] README with project name + 2-line description
-- [ ] Python version fixed (e.g., 3.10)
-- [ ] Virtual environment created
-- [ ] Requirements file created
-### Folder structure
-
-- [ ] `agent/` folder exists
-- [ ] `verifier/` folder exists
-- [ ] `blockchain/` folder exists
-- [ ] `marketplace/` folder exists
-- [ ] `consumer/` folder exists
-- [ ] `shared/` folder exists
+☠️ If this moves, everything breaks later.
 
 ---
 
-## 🧩 PHASE 2 — ENVIRONMENT (FOUNDATION)
+## 🧩 PHASE 2 — REPOSITORY, MODULARITY & HYGIENE
+
+### Repo & standards
+
+* [ ] Single Git repository
+* [ ] Project name: **PolicyLedger**
+* [ ] README with:
+
+  * Problem (2 lines)
+  * Architecture summary
+  * Google services used
+* [ ] Python version fixed (3.10+)
+* [ ] Virtual environment created
+* [ ] `requirements.txt` split into:
+
+  * `requirements-cloud.txt`
+  * `requirements-local.txt`
+
+### Folder structure (STRICT)
+
+* [ ] `agent/`
+* [ ] `verifier/`
+* [ ] `ledger/`
+* [ ] `marketplace/`
+* [ ] `consumer/`
+* [ ] `explainability/`
+* [ ] `shared/`
+
+🧱 Each folder exposes **interfaces**, not concrete logic.
+
+---
+
+## 🧩 PHASE 3 — ENVIRONMENT (SHARED, DETERMINISTIC)
 
 ### Environment design
 
-- [ ] Environment name defined (`EnergySlotEnv`)
-- [ ] Discrete time steps defined (e.g., 24)
-- [ ] Battery capacity defined (normalized 0–1)
-- [ ] Demand schedule deterministic
-- [ ] Reward function written on paper first
+* [ ] Environment name: `EnergySlotEnv`
+* [ ] Discrete time steps fixed (e.g., 24)
+* [ ] Battery capacity normalized (0–1)
+* [ ] Demand schedule deterministic + seeded
+* [ ] Reward function written **before coding**
 
-### Code checklist (`env.py`)
+### Code checklist (`shared/env.py`)
 
-- [ ] `reset()` implemented
-- [ ] `step(action)` implemented
-- [ ] Battery update logic correct
-- [ ] Demand logic reproducible
-- [ ] Reward calculation deterministic
-- [ ] Terminal condition defined
-- [ ] Same seed produces same results
+* [ ] `reset()` implemented
+* [ ] `step(action)` implemented
+* [ ] Battery update logic deterministic
+* [ ] Demand logic reproducible
+* [ ] Reward calculation deterministic
+* [ ] Terminal condition defined
+* [ ] Same seed → same trajectory
 
 🚫 No randomness without seed
-🚫 No environment logic inside agent
+🚫 Environment logic NEVER inside agent or verifier
 
 ---
 
-## 🧩 PHASE 3 — RL AGENT (LEARNER)
+## 🧩 PHASE 4 — RL AGENT (EDGE LEARNING NODE)
 
 ### RL design
 
-- [ ] State space discretized
-- [ ] Action space = {SAVE, USE}
-- [ ] Learning rate fixed
-- [ ] Discount factor fixed
-- [ ] Exploration strategy defined
+* [ ] State space discretized
+* [ ] Action space = `{SAVE, USE}`
+* [ ] Learning rate fixed
+* [ ] Discount factor fixed
+* [ ] Exploration strategy defined
+
+### Google-first
+
+* [ ] Q-learning implemented using **TensorFlow**
+* [ ] Policy exported as **TensorFlow Lite**
+
+### Fallback
+
+* [ ] Pure Python Q-table
+* [ ] Policy stored as JSON
 
 ### Code checklist
 
-- [ ] Q-table initialized
-- [ ] Epsilon-greedy action selection
-- [ ] Q-update formula implemented
-- [ ] Episode loop implemented
-- [ ] Reward accumulated correctly
-- [ ] Average reward computed
-- [ ] Training reproducible with seed
-### Policy extraction
+* [ ] Q-table initialized
+* [ ] Epsilon-greedy selection
+* [ ] Q-update formula correct
+* [ ] Episode loop implemented
+* [ ] Cumulative reward tracked
+* [ ] Average reward computed
+* [ ] Training reproducible with seed
 
-- [ ] Policy extracted from Q-table
-- [ ] Policy stored as JSON/dict
-- [ ] Policy hash generated (SHA-256)
+### Policy artifact
 
-🚫 No deep learning
-🚫 No libraries you can’t explain
+* [ ] Policy serialized
+* [ ] Policy hash generated (SHA-256)
+* [ ] Policy metadata stored (agent_id, env_id)
 
----
-
-## 🧩 PHASE 4 — MULTIPLE AGENTS
-
-- [ ] Agent A trains independently
-- [ ] Agent B trains independently
-- [ ] Agents use same environment definition
-- [ ] Agents produce different policies
-- [ ] Agents produce different rewards
-- [ ] Agent IDs unique
-
-🧠 This proves decentralization.
+🚫 No deep RL
+🚫 No libraries you can’t explain to judges
 
 ---
 
-## 🧩 PHASE 5 — SUBMISSION LAYER
+## 🧩 PHASE 5 — MULTI-AGENT DECENTRALIZATION
 
-- [ ] Submission payload schema defined
-- [ ] Payload contains:
+* [ ] Agent A trains independently
+* [ ] Agent B trains independently
+* [ ] Same environment definition used
+* [ ] Different learned policies produced
+* [ ] Different rewards observed
+* [ ] Unique agent IDs enforced
 
-  - [ ] agent_id
-  - [ ] policy
-  - [ ] policy_hash
-  - [ ] claimed_reward
-- [ ] Submissions stored temporarily
-- [ ] Submission order preserved
-
-🚫 No peer-to-peer sharing
-🚫 No direct agent trust
+🧠 This is your **proof of decentralization**.
 
 ---
 
-## 🧩 PHASE 6 — VERIFIER (CRITICAL)
+## 🧩 PHASE 6 — SUBMISSION LAYER (NO TRUST)
+
+### Google-first
+
+* [ ] Firebase REST API endpoint
+
+### Fallback
+
+* [ ] Local submission queue (JSON / in-memory)
+
+### Submission payload schema
+
+* [ ] `agent_id`
+* [ ] `policy_hash`
+* [ ] `policy_artifact`
+* [ ] `claimed_reward`
+* [ ] `environment_id`
+
+🚫 Agents NEVER talk to verifier directly
+🚫 No peer-to-peer trust
+
+---
+
+## 🧩 PHASE 7 — VERIFICATION LAYER (CORE NOVELTY)
+
+### Google-first
+
+* [ ] **Vertex AI Custom Job**
+* [ ] Deterministic replay using shared env
+* [ ] Reward recomputation
+
+### Fallback
+
+* [ ] Local verifier script
+* [ ] Same replay logic
 
 ### Verification logic
 
-- [ ] Policy loaded correctly
-- [ ] Same environment used for replay
-- [ ] Replay produces reward
-- [ ] Reward comparison threshold defined
-- [ ] Invalid submissions rejected
-- [ ] Valid submissions approved
+* [ ] Policy loaded correctly
+* [ ] Replay produces reward
+* [ ] Reward mismatch threshold defined
+* [ ] Invalid claims rejected
+* [ ] Valid claims approved
 
 ### Edge cases
 
-- [ ] Fake inflated reward rejected
-- [ ] Modified policy hash detected
-- [ ] Deterministic replay confirmed
+* [ ] Inflated reward rejected
+* [ ] Policy hash mismatch detected
+* [ ] Deterministic replay confirmed
 
-🔥 This is your **core novelty**. Nail this.
-
----
-
-## 🧩 PHASE 7 — BLOCKCHAIN LEDGER (PROTOTYPE)
-
-- [ ] Ledger file initialized
-- [ ] Append-only logic enforced
-- [ ] Each block includes:
-
-  - [ ] policy_hash
-  - [ ] verified_reward
-  - [ ] agent_id
-  - [ ] timestamp
-- [ ] No overwrite allowed
-- [ ] Ledger readable by marketplace
-
-🚫 No crypto wallets
-🚫 No token economics
+🔥 This is the heart of the project.
 
 ---
 
-## 🧩 PHASE 8 — MARKETPLACE (RANKING)
+## 🧩 PHASE 8 — POLICY LEDGER (GOOGLE-NATIVE BLOCKCHAIN)
 
-- [ ] Ledger read successfully
-- [ ] Policies sorted by verified_reward
-- [ ] Best policy selected
-- [ ] Tie-breaking logic defined
-- [ ] Ranking output visible (print/table)
+### Google-first
+
+* [ ] Firestore append-only collection
+* [ ] Each entry stores:
+
+  * `policy_hash`
+  * `verified_reward`
+  * `agent_id`
+  * `timestamp`
+  * `previous_hash`
+* [ ] Firestore rules enforce immutability
+
+### Fallback
+
+* [ ] Local append-only JSON ledger
+* [ ] Hash-chained entries
+
+🚫 No wallets
+🚫 No tokens
+🚫 No crypto buzzwords
+
+---
+
+## 🧩 PHASE 9 — MARKETPLACE (EVENT-DRIVEN)
+
+### Google-first
+
+* [ ] Cloud Function triggered on new ledger entry
+* [ ] Policies ranked by verified reward
+* [ ] Best policy reference updated
+
+### Fallback
+
+* [ ] Local ranking script
+
+### Logic
+
+* [ ] Tie-breaking rule defined
+* [ ] Ranking output visible
 
 🧠 This is where “marketplace” becomes real.
 
 ---
 
-## 🧩 PHASE 9 — POLICY REUSE (WOW MOMENT)
+## 🧩 PHASE 10 — POLICY REUSE (THE WOW MOMENT)
 
-- [ ] New device initialized
-- [ ] Best policy fetched
-- [ ] No training performed
-- [ ] Environment run with reused policy
-- [ ] Performance logged
-- [ ] Compared vs random policy
+### Google-first
 
-🔥 This is your demo climax.
+* [ ] Best policy fetched via Firebase
+* [ ] Policy loaded via TFLite runtime
+
+### Fallback
+
+* [ ] Local policy fetch
+* [ ] JSON runner
+
+### Demo proof
+
+* [ ] No retraining
+* [ ] Environment run immediately
+* [ ] Performance logged
+* [ ] Compared against random policy
+
+🔥 Judges remember this.
 
 ---
 
-## 🧩 PHASE 10 — HARDWARE DEMO (OPTIONAL BUT NICE)
+## 🧩 PHASE 11 — EXPLAINABILITY (OPTIONAL BUT POWERFUL)
 
-- [ ] Old phone runs agent OR consumer
-- [ ] Laptop runs verifier
-- [ ] Network communication works
-- [ ] Logs visible on screen
-- [ ] Physical presence explained clearly
+### Google-first
+
+* [ ] Gemini API generates explanation:
+
+  * Why policy won
+  * What strategy it used
+
+### Fallback
+
+* [ ] Template-based explanation
+
+🧠 Makes RL human-understandable.
+
+---
+
+## 🧩 PHASE 12 — HARDWARE DEMO (MINIMAL)
+
+* [ ] Old phone runs agent OR consumer
+* [ ] Laptop runs verifier / marketplace
+* [ ] Network communication works
+* [ ] Logs visible live
+* [ ] Hardware role explained clearly
 
 🚫 Motors
-🚫 Sensors you don’t need
+🚫 Sensors
+🚫 Overkill electronics
 
 ---
 
-## 🧩 PHASE 11 — LOGGING & VISIBILITY
+## 🧩 PHASE 13 — LOGGING & VISIBILITY
 
-- [ ] Clear print statements at each stage
-- [ ] Rewards printed clearly
-- [ ] Verification decision printed
-- [ ] Ledger entries visible
-- [ ] Ranking visible
+* [ ] Clear logs at every stage
+* [ ] Rewards printed clearly
+* [ ] Verification decision visible
+* [ ] Ledger entries visible
+* [ ] Ranking output visible
+* [ ] Policy reuse metrics visible
 
-Judges don’t read code. They read **output**.
+Judges read **outputs**, not code.
 
 ---
 
-## 🧩 PHASE 12 — STORY & PITCH
+## 🧩 PHASE 14 — STORY, PITCH & IEEE PATH
 
-- [ ] Problem explained in 30 seconds
-- [ ] Architecture explained in 60 seconds
-- [ ] Verifier explained clearly
-- [ ] Demo rehearsed twice
-- [ ] Failure scenario prepared
-- [ ] IEEE extension mentioned briefly
+* [ ] 30-second problem explanation
+* [ ] 60-second architecture explanation
+* [ ] Verifier explained clearly
+* [ ] Google services justified
+* [ ] Demo rehearsed twice
+* [ ] IEEE extension mentioned (verification + reuse)
+
 🚫 No buzzword salad
 🚫 No overclaiming
 
 ---
 
-## 🧩 PHASE 13 — FINAL SANITY CHECK
+## 🧩 PHASE 15 — FINAL SANITY CHECK
 
-- [ ] Demo works offline
-- [ ] No internet dependency
-- [ ] Code runs on fresh machine
-- [ ] Repo is clean
-- [ ] One teammate can explain whole system
+* [ ] Works fully offline (fallback)
+* [ ] Works fully cloud-native (Google)
+* [ ] Fresh machine run tested
+* [ ] Repo clean & documented
+* [ ] One teammate can explain end-to-end
 
 If one person can’t explain it all, judges won’t either.
+
+---
+
+## 🧠 FINAL LINE (REMEMBER THIS)
+
+> **“PolicyLedger learns at the edge, verifies in the cloud, remembers immutably, and reuses intelligence.”**

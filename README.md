@@ -1,2 +1,2 @@
 # PolicyLedger
-A decentralized marketplace for verifiable reinforcement learning policies
+A Google Cloud–native marketplace for verifiable reinforcement learning policies
