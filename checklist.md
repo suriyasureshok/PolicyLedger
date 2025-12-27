@@ -63,21 +63,21 @@
 
 ### Environment design
 
-* [ ] Environment name: `EnergySlotEnv`
-* [ ] Discrete time steps fixed (e.g., 24)
-* [ ] Battery capacity normalized (0–1)
-* [ ] Demand schedule deterministic + seeded
-* [ ] Reward function written **before coding**
+* [x] Environment name: `EnergySlotEnv`
+* [x] Discrete time steps fixed (e.g., 24)
+* [x] Battery capacity normalized (0–1)
+* [x] Demand schedule deterministic + seeded
+* [x] Reward function written **before coding**
 
 ### Code checklist (`src/shared/env.py`)
 
-* [ ] `reset()` implemented
-* [ ] `step(action)` implemented
-* [ ] Battery update logic deterministic
-* [ ] Demand logic reproducible
-* [ ] Reward calculation deterministic
-* [ ] Terminal condition defined
-* [ ] Same seed → same trajectory
+* [x] `reset()` implemented
+* [x] `step(action)` implemented
+* [x] Battery update logic deterministic
+* [x] Demand logic reproducible
+* [x] Reward calculation deterministic
+* [x] Terminal condition defined
+* [x] Same seed → same trajectory
 
 🚫 No randomness without seed
 🚫 Environment logic NEVER inside agent or verifier
