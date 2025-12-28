@@ -166,29 +166,29 @@
 ### Google-first
 
 * [ ] **Vertex AI Custom Job**
-* [ ] Deterministic replay using shared env
-* [ ] Reward recomputation
+* [x] Deterministic replay using shared env
+* [x] Reward recomputation
 
 ### Fallback
 
-* [ ] Local verifier script
-* [ ] Same replay logic
+* [x] Local verifier script
+* [x] Same replay logic
 
 ### Verification logic
 
-* [ ] Policy loaded correctly
-* [ ] Replay produces reward
-* [ ] Reward mismatch threshold defined
-* [ ] Invalid claims rejected
-* [ ] Valid claims approved
+* [x] Policy loaded correctly
+* [x] Replay produces reward
+* [x] Reward mismatch threshold defined
+* [x] Invalid claims rejected
+* [x] Valid claims approved
 
 ### Edge cases
 
-* [ ] Inflated reward rejected
-* [ ] Policy hash mismatch detected
-* [ ] Deterministic replay confirmed
+* [x] Inflated reward rejected
+* [x] Policy hash mismatch detected
+* [x] Deterministic replay confirmed
 
-🔥 This is the heart of the project.
+🔥 This is the heart of the project. ✅ **COMPLETE**
 
 ---
 

@@ -14,7 +14,8 @@ from src.shared.config import (
     DEFAULT_ENERGY_COST
 )
 from src.agent.trainer import train
-from src.agent.policy import extract_policy, serialize_policy, hash_policy
+from src.agent.policy import extract_policy, serialize_policy, hash_policy, Policy
+from src.agent.state import discretize_state
 
 
 class PolicyClaim(NamedTuple):
@@ -38,6 +39,50 @@ class PolicyClaim(NamedTuple):
             f"  claimed_reward={self.claimed_reward:.3f}\n"
             f")"
         )
+
+
+def evaluate_policy(env: EnergySlotEnv, policy: Policy) -> float:
+    """
+    Evaluate a deterministic policy by running it greedily in the environment.
+    
+    This produces the reward that should be claimed (and verifiable).
+    
+    Args:
+        env: Environment instance
+        policy: Deterministic policy {state: action}
+    
+    Returns:
+        Total reward from running policy greedily
+    
+    Rules:
+        - No exploration (greedy only)
+        - Single evaluation run
+        - Uses exact same logic as verifier replay
+    """
+    # Reset environment
+    state_dict = env.reset()
+    
+    # Accumulate reward
+    total_reward = 0.0
+    
+    # Run episode
+    while not env.done:
+        # Discretize state
+        state_tuple = discretize_state(state_dict)
+        
+        # Get action from policy (greedy)
+        if state_tuple not in policy:
+            raise ValueError(f"Policy incomplete: missing action for state {state_tuple}")
+        
+        action = policy[state_tuple]
+        
+        # Take action
+        state_dict, reward, done = env.step(action)
+        
+        # Accumulate reward
+        total_reward += reward
+    
+    return total_reward
 
 
 def run_agent(
@@ -89,10 +134,16 @@ def run_agent(
     env_id = f"energy_slot_env_seed_{seed}_slots_{time_slots}"
     
     # Train policy
-    q_table, avg_reward = train(env, episodes)
+    q_table, avg_training_reward = train(env, episodes)
     
     # Extract deterministic policy
     policy = extract_policy(q_table)
+    
+    # CRITICAL: Evaluate the final policy to get claimable reward
+    # This must match what the verifier will compute during replay
+    # The average training reward includes exploration and early learning,
+    # but the verifier runs the greedy policy, so we must claim that reward.
+    claimed_reward = evaluate_policy(env, policy)
     
     # Serialize policy
     policy_bytes = serialize_policy(policy)
@@ -106,7 +157,7 @@ def run_agent(
         env_id=env_id,
         policy_hash=policy_hash_str,
         policy_artifact=policy_bytes,
-        claimed_reward=avg_reward
+        claimed_reward=claimed_reward  # Use evaluated reward, not training average
     )
     
     return claim
