@@ -88,11 +88,11 @@
 
 ### RL design
 
-* [ ] State space discretized
-* [ ] Action space = `{SAVE, USE}`
-* [ ] Learning rate fixed
-* [ ] Discount factor fixed
-* [ ] Exploration strategy defined
+* [x] State space discretized
+* [x] Action space = `{SAVE, USE}`
+* [x] Learning rate fixed
+* [x] Discount factor fixed
+* [x] Exploration strategy defined
 
 ### Google-first
 
@@ -101,24 +101,24 @@
 
 ### Fallback
 
-* [ ] Pure Python Q-table
-* [ ] Policy stored as JSON
+* [x] Pure Python Q-table
+* [x] Policy stored as JSON
 
 ### Code checklist
 
-* [ ] Q-table initialized
-* [ ] Epsilon-greedy selection
-* [ ] Q-update formula correct
-* [ ] Episode loop implemented
-* [ ] Cumulative reward tracked
-* [ ] Average reward computed
-* [ ] Training reproducible with seed
+* [x] Q-table initialized
+* [x] Epsilon-greedy selection
+* [x] Q-update formula correct
+* [x] Episode loop implemented
+* [x] Cumulative reward tracked
+* [x] Average reward computed
+* [x] Training reproducible with seed
 
 ### Policy artifact
 
-* [ ] Policy serialized
-* [ ] Policy hash generated (SHA-256)
-* [ ] Policy metadata stored (agent_id, env_id)
+* [x] Policy serialized
+* [x] Policy hash generated (SHA-256)
+* [x] Policy metadata stored (agent_id, env_id)
 
 🚫 No deep RL
 🚫 No libraries you can’t explain to judges
@@ -127,12 +127,12 @@
 
 ## 🧩 PHASE 5 — MULTI-AGENT DECENTRALIZATION
 
-* [ ] Agent A trains independently
-* [ ] Agent B trains independently
-* [ ] Same environment definition used
-* [ ] Different learned policies produced
-* [ ] Different rewards observed
-* [ ] Unique agent IDs enforced
+* [x] Agent A trains independently
+* [x] Agent B trains independently
+* [x] Same environment definition used
+* [x] Different learned policies produced
+* [x] Different rewards observed
+* [x] Unique agent IDs enforced
 
 🧠 This is your **proof of decentralization**.
 
@@ -146,15 +146,15 @@
 
 ### Fallback
 
-* [ ] Local submission queue (JSON / in-memory)
+* [x] Local submission queue (JSON / in-memory)
 
 ### Submission payload schema
 
-* [ ] `agent_id`
-* [ ] `policy_hash`
-* [ ] `policy_artifact`
-* [ ] `claimed_reward`
-* [ ] `environment_id`
+* [x] `agent_id`
+* [x] `policy_hash`
+* [x] `policy_artifact`
+* [x] `claimed_reward`
+* [x] `environment_id`
 
 🚫 Agents NEVER talk to verifier directly
 🚫 No peer-to-peer trust
