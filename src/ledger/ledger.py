@@ -1,25 +1,28 @@
 """
-Policy Ledger — Tamper-Evident Memory
+ledger.py
 
-PURPOSE:
-    Answer ONE question: "Once a policy is verified as valid, 
-    how do we record it so it cannot be silently altered or erased?"
+Tamper-evident policy storage using hash chaining.
 
-PROPERTIES:
-    - Append-only
-    - Passive
-    - Trust-preserving
+Detailed description:
+- What problem this module solves: Provides immutable, tamper-evident storage for verified policy claims using blockchain-inspired hash chaining
+- What it does NOT do: Does not perform policy verification, training, or modification; focuses solely on secure storage and integrity checking
+- Any assumptions or constraints: Assumes policies are pre-verified; relies on SHA-256 for cryptographic integrity; requires append-only operations
 
-NOT A:
-    - Verifier
-    - Ranker
-    - Database with updates
-    - Crypto system
+Main Components:
+- LedgerEntry: Immutable data structure for policy verification records
+- PolicyLedger: Main class with append-only operations and integrity verification
+- verify_chain_integrity(): Function for tamper detection through hash chain validation
+- compute_entry_hash(): Function for SHA-256 hash computation of entries
 
-MENTAL MODEL:
-    Ledger = official mark register in a school
-    Marks written once, no erasing, no rewriting.
-    If someone tampers → detectable.
+Dependencies:
+- hashlib: For cryptographic hash functions
+- json: For entry serialization and deserialization
+- datetime: For timestamp generation
+- pathlib: For file system operations
+- typing: For type hints and annotations
+
+Author: Your Name
+Created: 2025-12-28
 """
 
 from typing import List, NamedTuple, Optional
@@ -31,25 +34,24 @@ from pathlib import Path
 
 class LedgerEntry(NamedTuple):
     """
-    Immutable ledger entry for a verified policy.
-    
-    This is the FINAL & FROZEN schema.
-    
-    Fields:
-        policy_hash: SHA-256 hash of policy artifact
-        verified_reward: Reward confirmed by verifier
-        agent_id: Agent identifier
-        timestamp: ISO format timestamp
-        previous_hash: Hash of previous ledger entry (or "genesis")
-        current_hash: Hash of this entry (for chain verification)
-    
-    What it does NOT contain:
-        ❌ Training metadata
-        ❌ Claimed reward
-        ❌ Policy artifact
-        ❌ Ranking info
-    
-    Ledger stores truth only, not claims.
+    Immutable ledger entry for a verified policy claim.
+
+    Represents a single verified policy record in the tamper-evident ledger.
+    Each entry contains the essential information about a policy that has
+    passed verification, with cryptographic links to maintain chain integrity.
+
+    Attributes:
+        policy_hash: SHA-256 hash of the policy artifact
+        verified_reward: Reward confirmed by the verification layer
+        agent_id: Unique identifier of the agent that created the policy
+        timestamp: ISO 8601 formatted timestamp of verification
+        previous_hash: SHA-256 hash of the previous ledger entry (or "genesis")
+        current_hash: SHA-256 hash of this entry for chain verification
+
+    Note:
+        This structure contains ONLY verified information - no training metadata,
+        claimed rewards, or policy artifacts. It serves as an immutable record
+        of what was verified and when.
     """
     policy_hash: str
     verified_reward: float
@@ -84,29 +86,24 @@ def compute_entry_hash(
 ) -> str:
     """
     Compute deterministic hash for ledger entry.
-    
-    This creates the hash chain:
-        current_hash = hash(policy_hash + verified_reward + 
-                          agent_id + timestamp + previous_hash)
-    
-    If any old entry changes → all future hashes break.
-    That's tamper-evident, not crypto hype.
-    
+
+    Creates the cryptographic link in the hash chain. Any modification to
+    an existing entry will break all subsequent hashes, making tampering
+    immediately detectable.
+
     Args:
-        policy_hash: Policy artifact hash
-        verified_reward: Verified reward value
-        agent_id: Agent identifier
-        timestamp: ISO timestamp
-        previous_hash: Hash of previous entry
-    
+        policy_hash: SHA-256 hash of the policy artifact
+        verified_reward: Reward value confirmed by verification layer
+        agent_id: Unique identifier of the agent
+        timestamp: ISO 8601 formatted timestamp
+        previous_hash: SHA-256 hash of the previous ledger entry
+
     Returns:
-        SHA-256 hash as hexadecimal string
-    
-    Rules:
-        - Deterministic: same inputs → same hash
-        - No randomness
-        - No salt
-        - No timestamps in hash computation itself
+        SHA-256 hash as 64-character hexadecimal string
+
+    Note:
+        Hash is computed deterministically from all entry fields.
+        Same inputs always produce the same hash.
     """
     # Create deterministic string representation
     # Format: "field1|field2|field3|..." for clarity
@@ -118,25 +115,29 @@ def compute_entry_hash(
 
 def verify_chain_integrity(entries: List[LedgerEntry]) -> tuple[bool, Optional[str]]:
     """
-    Verify that ledger chain is intact and untampered.
-    
-    This checks:
-    1. First entry has previous_hash = "genesis"
-    2. Each entry's current_hash is correctly computed
-    3. Each entry's previous_hash matches previous entry's current_hash
-    
+    Verify that a list of ledger entries forms a valid hash chain.
+
+    Performs comprehensive validation of the cryptographic hash chain to detect
+    any tampering, modification, or corruption of the ledger entries.
+
+    Validation checks:
+        1. First entry has previous_hash = "genesis"
+        2. Each entry current_hash matches computed hash of its data
+        3. Each entry previous_hash matches the previous entry current_hash
+        4. Chain continuity is maintained throughout
+
     Args:
-        entries: List of ledger entries in order
-    
+        entries: List of LedgerEntry objects in chronological order
+
     Returns:
-        (is_valid, error_message)
-        - (True, None) if chain is intact
-        - (False, reason) if tampering detected
-    
-    This is how we detect:
-        - Modified entries
-        - Deleted entries
-        - Reordered entries
+        Tuple of (is_valid, error_message) where:
+        - is_valid: True if all checks pass, False if any validation fails
+        - error_message: Detailed description of the validation failure,
+          or None if validation succeeds
+
+    Note:
+        Can detect: modified entries, deleted entries, reordered entries,
+        and any other form of tampering that breaks the hash chain.
     """
     if len(entries) == 0:
         return True, None  # Empty ledger is valid
@@ -195,34 +196,40 @@ def verify_chain_integrity(entries: List[LedgerEntry]) -> tuple[bool, Optional[s
 class PolicyLedger:
     """
     Tamper-evident, append-only policy ledger.
-    
-    This is storage-agnostic interface.
-    Implementations provide actual storage (JSON, Firestore, etc.)
-    
+
+    Implements blockchain-inspired hash chaining to provide immutable storage
+    for verified policy claims. Any attempt to modify or delete past entries
+    is immediately detectable through chain verification.
+
+    Core Properties:
+        - Append-only: New entries can be added but existing ones are immutable
+        - Tamper-evident: Cryptographic hash chaining detects any modifications
+        - Trust-preserving: Maintains integrity of verification records
+        - Storage-agnostic: Interface allows different storage implementations
+
     Responsibilities:
-    1. Append verified entries
-    2. Read ledger entries
-    
-    Does NOT:
-        ❌ Verify rewards
-        ❌ Check policy validity
-        ❌ Reject duplicates
-        ❌ Sort entries
-        ❌ Modify past entries
-        ❌ Rank policies
-        ❌ Decide best policy
-        ❌ Accept unverified data
-    
-    Ledger is dumb memory. That's its strength.
+        - Store verified policy claims with cryptographic integrity
+        - Provide read access to ledger entries
+        - Enable tamper detection through chain verification
+
+    Non-Responsibilities:
+        - Policy verification (handled by verifier layer)
+        - Policy ranking (handled by marketplace layer)
+        - Policy storage (artifacts stored separately)
+        - Training or execution (handled by agent/consumer layers)
+
+    Attributes:
+        storage_path: Path to JSON file for persistent storage
+        _entries: In-memory list of ledger entries
     """
-    
+
     def __init__(self, storage_path: Optional[str] = None):
         """
-        Initialize ledger.
-        
+        Initialize ledger with optional storage path.
+
         Args:
-            storage_path: Path for JSON storage (fallback implementation)
-                         If None, uses default: "ledger.json"
+            storage_path: Path to JSON file for persistent storage.
+                If None, defaults to "ledger.json" in current directory.
         """
         self.storage_path = Path(storage_path or "ledger.json")
         self._entries: List[LedgerEntry] = []
@@ -239,32 +246,30 @@ class PolicyLedger:
         agent_id: str
     ) -> LedgerEntry:
         """
-        Append a verified policy to the ledger.
-        
-        This is called ONLY after verifier says VALID.
-        If verifier says INVALID → ledger never sees it.
-        
+        Append a verified policy claim to the ledger.
+
+        Called ONLY after the verification layer has confirmed the policy
+        validity and reward. Creates a new immutable entry with cryptographic
+        hash chaining to maintain tamper-evident properties.
+
         Process:
-        1. Read last ledger entry (if exists)
-        2. Compute previous_hash
-        3. Generate timestamp
-        4. Compute current_hash
-        5. Append entry
-        6. Persist to storage
-        
+            1. Determine previous hash (genesis for first entry)
+            2. Generate current timestamp
+            3. Compute cryptographic hash of entry data
+            4. Create and store LedgerEntry
+            5. Persist to storage
+
         Args:
-            policy_hash: Verified policy artifact hash
-            verified_reward: Reward confirmed by verifier
-            agent_id: Agent identifier
-        
+            policy_hash: SHA-256 hash of the verified policy artifact
+            verified_reward: Reward value confirmed by verification layer
+            agent_id: Unique identifier of the agent that created the policy
+
         Returns:
-            The created LedgerEntry
-        
-        Rules:
-            - Does NOT verify the reward
-            - Does NOT check policy validity
-            - Does NOT reject duplicates
-            - Just appends the fact
+            The newly created LedgerEntry with all computed fields
+
+        Note:
+            This method trusts the caller (verification layer) completely.
+            It performs no validation of the provided data.
         """
         # Get previous entry hash
         if len(self._entries) == 0:
@@ -308,19 +313,18 @@ class PolicyLedger:
     
     def read_all(self) -> List[LedgerEntry]:
         """
-        Return all ledger entries in order.
-        
+        Return all ledger entries in chronological order.
+
+        Provides read access to the complete ledger history. Entries are
+        returned in the order they were appended, maintaining the immutable
+        sequence of verified policy claims.
+
         Returns:
-            List of LedgerEntry in append order
-        
-        Rules:
-            - Does NOT filter
-            - Does NOT rank
-            - Does NOT modify
-            - Does NOT fix inconsistencies
-            - Returns raw truth
-        
-        Ledger is memory, not intelligence.
+            List of LedgerEntry objects in append order (oldest first)
+
+        Note:
+            Returns a copy to prevent external modification of ledger state.
+            The ledger itself remains immutable.
         """
         return self._entries.copy()
     
@@ -345,12 +349,21 @@ class PolicyLedger:
     
     def verify_integrity(self) -> tuple[bool, Optional[str]]:
         """
-        Verify that ledger chain is intact and untampered.
-        
+        Verify that the ledger hash chain is intact and untampered.
+
+        Checks the cryptographic integrity of the entire ledger by validating
+        the hash chain. Any modification to past entries will break the chain
+        and be detected immediately.
+
         Returns:
-            (is_valid, error_message)
-        
-        This should be called by marketplace or audit tools.
+            Tuple of (is_valid, error_message) where:
+            - is_valid: True if chain is intact, False if tampered
+            - error_message: Description of the problem if validation fails,
+              None if validation succeeds
+
+        Note:
+            This method should be called regularly by audit tools or before
+            critical operations like policy ranking.
         """
         return verify_chain_integrity(self._entries)
     
@@ -365,8 +378,8 @@ class PolicyLedger:
         This is the fallback implementation.
         
         Rules:
-            - If file doesn't exist → start with empty ledger
-            - If file corrupted → FAIL LOUDLY (don't auto-repair)
+            - If file does not exist -> start with empty ledger
+            - If file corrupted -> FAIL LOUDLY (do not auto-repair)
         """
         if not self.storage_path.exists():
             self._entries = []
@@ -448,7 +461,7 @@ class PolicyLedger:
             f"PolicyLedger(\n"
             f"  total_entries={len(self._entries)},\n"
             f"  storage='{self.storage_path}',\n"
-            f"  integrity={'✅ INTACT' if self.verify_integrity()[0] else '❌ COMPROMISED'}\n"
+            f"  integrity={'VALID' if self.verify_integrity()[0] else 'INVALID'}\n"
             f")"
         )
 
@@ -460,10 +473,10 @@ class PolicyLedger:
 def create_ledger(storage_path: Optional[str] = None) -> PolicyLedger:
     """
     Create or load a policy ledger.
-    
+
     Args:
         storage_path: Path for ledger storage
-    
+
     Returns:
         PolicyLedger instance
     """

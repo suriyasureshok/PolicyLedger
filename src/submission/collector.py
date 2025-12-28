@@ -1,8 +1,30 @@
 """
-Submission Collector - Intentionally Dumb
+collector.py
 
-This is the quarantine zone between learning and trust.
-Accepts claims blindly. Does nothing smart.
+Submission collector for managing policy claims before verification.
+
+Detailed description:
+- What problem this module solves: Provides a quarantine zone for collecting policy claims from agents before they are verified and stored in the ledger
+- What it does NOT do: Does not perform verification, training, or policy execution; acts as a simple, dumb collection point
+- Any assumptions or constraints: Accepts claims blindly without validation; relies on external verification for trust establishment
+
+Main Components:
+- Submission: Immutable record structure for policy claims with timestamps
+- SubmissionCollector: Class for collecting, storing, and retrieving policy submissions
+- submit(): Accepts and stores a new policy claim
+- get_all_submissions(): Retrieves all collected submissions
+- save_to_json(): Persists submissions to JSON file
+- load_from_json(): Loads submissions from JSON file
+
+Dependencies:
+- typing: For type hints and annotations
+- datetime: For timestamp generation
+- json: For serialization and deserialization
+- os: For file system operations
+- src.agent.runner: For PolicyClaim structure
+
+Author: Your Name
+Created: 2025-12-28
 """
 
 from typing import List, NamedTuple, Optional
@@ -14,9 +36,17 @@ from src.agent.runner import PolicyClaim
 
 class Submission(NamedTuple):
     """
-    Submission record with timestamp.
-    
-    This is what gets stored when an agent submits.
+    Immutable submission record with timestamp.
+
+    Responsibilities:
+    - Store policy claim with submission metadata
+    - Provide unique identification for each submission
+    - Preserve submission order and timing
+
+    Attributes:
+        claim (PolicyClaim): The policy claim submitted by an agent
+        timestamp (str): ISO format timestamp of submission
+        submission_id (int): Unique sequential identifier
     """
     claim: PolicyClaim
     timestamp: str
@@ -36,56 +66,46 @@ class Submission(NamedTuple):
 
 class SubmissionCollector:
     """
-    Blind submission collector.
-    
-    This is the exam submission desk. It:
-    - Accepts any claim
-    - Preserves order
-    - Records timestamp
-    - Does NOTHING else
-    
-    Rules:
-    - Does NOT verify rewards
-    - Does NOT compare agents
-    - Does NOT reject claims
-    - Does NOT modify artifacts
-    - Does NOT decide trust
-    
-    Metaphor: This is where students drop their answer sheets.
-              No grading happens here.
+    Blind submission collector for policy claims.
+
+    Responsibilities:
+    - Accept policy claims without validation or judgment
+    - Preserve submission order and timestamps
+    - Provide retrieval interfaces for collected submissions
+    - Support persistence for fallback storage
+
+    Attributes:
+        _submissions (List[Submission]): Internal list of all submissions
+        _next_id (int): Next available submission ID
     """
     
     def __init__(self):
-        """Initialize empty submission queue."""
+        """
+        Initialize empty submission collector.
+
+        Sets up internal storage for submissions with no initial data.
+        """
         self._submissions: List[Submission] = []
         self._next_id = 1
     
     def submit(self, claim: PolicyClaim) -> Submission:
         """
         Accept a policy claim submission.
-        
-        This is intentionally dumb. No validation, no judgment.
-        
+
         Args:
-            claim: PolicyClaim from an agent
-        
+            claim (PolicyClaim): Policy claim from an agent
+
         Returns:
-            Submission record with timestamp and ID
-        
-        Rules:
-            - Does NOT check if reward is valid
-            - Does NOT check if policy makes sense
-            - Does NOT compare with other submissions
-            - Just accepts and stores
+            Submission: Submission record with timestamp and unique ID
         """
-        # Create submission record
+        # Create submission record with timestamp and ID
         submission = Submission(
             claim=claim,
             timestamp=datetime.now().isoformat(),
             submission_id=self._next_id
         )
         
-        # Store it
+        # Store submission and increment ID counter
         self._submissions.append(submission)
         self._next_id += 1
         
@@ -94,21 +114,21 @@ class SubmissionCollector:
     def get_all_submissions(self) -> List[Submission]:
         """
         Get all submissions in order received.
-        
+
         Returns:
-            List of all submissions
+            List[Submission]: Copy of all submissions in submission order
         """
         return self._submissions.copy()
     
     def get_submission_by_id(self, submission_id: int) -> Optional[Submission]:
         """
         Get specific submission by ID.
-        
+
         Args:
-            submission_id: Submission ID
-        
+            submission_id (int): Unique submission identifier
+
         Returns:
-            Submission if found, None otherwise
+            Optional[Submission]: Submission if found, None otherwise
         """
         for submission in self._submissions:
             if submission.submission_id == submission_id:
@@ -118,12 +138,12 @@ class SubmissionCollector:
     def get_submissions_by_agent(self, agent_id: str) -> List[Submission]:
         """
         Get all submissions from specific agent.
-        
+
         Args:
-            agent_id: Agent identifier
-        
+            agent_id (str): Agent identifier
+
         Returns:
-            List of submissions from this agent
+            List[Submission]: All submissions from the specified agent
         """
         return [
             sub for sub in self._submissions
@@ -131,31 +151,30 @@ class SubmissionCollector:
         ]
     
     def count_submissions(self) -> int:
-        """Get total number of submissions."""
+        """
+        Get total number of submissions.
+
+        Returns:
+            int: Total count of collected submissions
+        """
         return len(self._submissions)
     
     def clear(self):
         """
-        Clear all submissions (for testing only).
-        
-        WARNING: This should NEVER be used in demo or production pipeline.
+        Clear all submissions.
+
+        Warning:
+            This should only be used for testing purposes.
         """
         self._submissions.clear()
         self._next_id = 1
     
     def save_to_json(self, filepath: str):
         """
-        Save submissions to JSON file (fallback persistence).
-        
-        This provides local fallback storage before Firebase integration.
-        
+        Save submissions to JSON file.
+
         Args:
-            filepath: Path to JSON file
-        
-        Rules:
-            - Does NOT modify submissions
-            - Does NOT filter or validate
-            - Just serializes verbatim
+            filepath (str): Path to JSON file for storage
         """
         submissions_data = []
         
@@ -166,7 +185,7 @@ class SubmissionCollector:
                 "agent_id": sub.claim.agent_id,
                 "env_id": sub.claim.env_id,
                 "policy_hash": sub.claim.policy_hash,
-                "policy_artifact": sub.claim.policy_artifact.hex(),  # Convert bytes to hex
+                "policy_artifact": sub.claim.policy_artifact.hex(),  # Serialize policy artifact to hex string for JSON compatibility
                 "claimed_reward": sub.claim.claimed_reward
             })
         
@@ -179,15 +198,14 @@ class SubmissionCollector:
     
     def load_from_json(self, filepath: str):
         """
-        Load submissions from JSON file (fallback persistence).
-        
+        Load submissions from JSON file.
+
         Args:
-            filepath: Path to JSON file
-        
-        Rules:
-            - Restores exact submission order
-            - Does NOT validate loaded data
-            - Trusts file content blindly
+            filepath (str): Path to JSON file to load from
+
+        Raises:
+            FileNotFoundError: If the specified file does not exist
+            JSONDecodeError: If the file contains invalid JSON
         """
         if not os.path.exists(filepath):
             return
@@ -195,13 +213,13 @@ class SubmissionCollector:
         with open(filepath, 'r') as f:
             data = json.load(f)
         
-        # Clear current submissions
+        # Clear current submissions before loading
         self._submissions.clear()
         
         # Restore from file
         max_id = 0
         for sub_data in data.get("submissions", []):
-            # Reconstruct PolicyClaim
+            # Reconstruct PolicyClaim from stored data
             claim = PolicyClaim(
                 agent_id=sub_data["agent_id"],
                 env_id=sub_data["env_id"],
@@ -220,7 +238,7 @@ class SubmissionCollector:
             self._submissions.append(submission)
             max_id = max(max_id, sub_data["submission_id"])
         
-        # Update next ID
+        # Update next ID to maintain uniqueness
         self._next_id = max_id + 1
     
     def __repr__(self) -> str:

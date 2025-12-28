@@ -1,8 +1,16 @@
 """
-Policy Ledger - Tamper-Evident Memory
+ledger
 
-"Once a policy is verified, its record becomes immutable — 
-any tampering is immediately detectable through hash chaining."
+Purpose:
+- What this package represents: Tamper-evident storage module for verified policy claims using hash chaining
+
+Public Exports:
+- LedgerEntry
+- PolicyLedger
+- verify_chain_integrity
+
+Usage:
+    from src.ledger import LedgerEntry, PolicyLedger
 """
 
 from src.ledger.ledger import (

@@ -1,16 +1,15 @@
 """
-Submission Layer Module
+submission
 
-This is the exam submission desk, NOT the examiner.
+Purpose:
+- What this package represents: Quarantine zone for collecting policy claims before verification
 
-Purpose: Accept claims without judgment
-- Does NOT verify rewards
-- Does NOT compare agents
-- Does NOT reject claims
-- Does NOT modify artifacts
-- Does NOT decide trust
+Public Exports:
+- SubmissionCollector
+- Submission
 
-If it does anything intelligent, the design is broken.
+Usage:
+    from src.submission import SubmissionCollector, Submission
 """
 
 from src.submission.collector import SubmissionCollector, Submission

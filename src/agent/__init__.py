@@ -1,8 +1,24 @@
 """
-Agent Module - Phase 4: RL Agent (Edge Learning Node)
+agent
 
-This module implements decentralized reinforcement learning.
-Each agent learns independently and produces verifiable policy artifacts.
+Purpose:
+- Implements decentralized reinforcement learning agents
+- Provides complete RL pipeline from training to policy submission
+- Enables edge learning with verifiable policy artifacts
+
+Public Exports:
+- run_agent: Main training orchestration function
+- quick_train: Convenience training function
+- PolicyClaim: Data structure for policy submissions
+- discretize_state: State space discretization
+- Training utilities (initialize_q_table, select_action, etc.)
+- Policy utilities (extract_policy, serialize_policy, etc.)
+
+Usage:
+    from src.agent import run_agent, PolicyClaim
+
+    # Train an agent
+    claim = run_agent(agent_id="agent_001", seed=42, episodes=500)
 """
 
 from src.agent.runner import run_agent, quick_train, PolicyClaim

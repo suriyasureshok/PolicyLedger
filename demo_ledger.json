@@ -3,28 +3,28 @@
   "total_entries": 3,
   "entries": [
     {
-      "policy_hash": "9752073d1b3cdf23b738a18436ec9a8189734ab395cd7babfeb77111401b82f4",
+      "policy_hash": "947a6750ab65380efc033189842f5f45749edc69ab9cf31296497bddf97a7ffd",
       "verified_reward": 15.0,
       "agent_id": "agent_001",
-      "timestamp": "2025-12-28T14:41:36.938398",
+      "timestamp": "2025-12-28T14:58:28.963248",
       "previous_hash": "genesis",
-      "current_hash": "c8d40696cb479b74d85fbc987e0c4339da383ae2951d0d4fa9234b4fc32eb6ab"
+      "current_hash": "a3ab0e145fd4b02a75649345f5636a05faab971f43fa324165eed9dc620e003a"
     },
     {
-      "policy_hash": "b9033b54c292f1c2e2f139965a014f1565783575d436d64ccbd70d31aa571c64",
+      "policy_hash": "077e1ef0390102689e305df3483d4858a2b75176b7a016ee84952bbf400db3f7",
       "verified_reward": 15.0,
       "agent_id": "agent_002",
-      "timestamp": "2025-12-28T14:41:36.999500",
-      "previous_hash": "c8d40696cb479b74d85fbc987e0c4339da383ae2951d0d4fa9234b4fc32eb6ab",
-      "current_hash": "3f1e763a1d3dca43929ac573f300992f0716a72ab3658f2e8f5939816fc5aabc"
+      "timestamp": "2025-12-28T14:58:28.966250",
+      "previous_hash": "a3ab0e145fd4b02a75649345f5636a05faab971f43fa324165eed9dc620e003a",
+      "current_hash": "85274446696b21bff469787a6839fb4150829e1633ca4583eac0c1165926e4ec"
     },
     {
-      "policy_hash": "1db3386fe54ce8efcf04fc4bcdb98715a7498bf0cc76a10252e687c4aa3ddca7",
+      "policy_hash": "305d78a129087177cb67544e1ef514fec4ac1b3f5284bff3fb64781b7b207411",
       "verified_reward": 15.0,
       "agent_id": "agent_003",
-      "timestamp": "2025-12-28T14:41:37.081504",
-      "previous_hash": "3f1e763a1d3dca43929ac573f300992f0716a72ab3658f2e8f5939816fc5aabc",
-      "current_hash": "e138948c75066d832a9de9b08b64a47ae7f7594c2f7d96c2439b7bd7800bcd32"
+      "timestamp": "2025-12-28T14:58:28.970251",
+      "previous_hash": "85274446696b21bff469787a6839fb4150829e1633ca4583eac0c1165926e4ec",
+      "current_hash": "a6597f31f87d30bd6b65e5f7393faa27fcca21134248866105feb6637971d323"
     }
   ]
 }

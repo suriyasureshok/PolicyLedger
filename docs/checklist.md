@@ -229,7 +229,7 @@
 
 ### Fallback
 
-* [ ] Local ranking script
+* [x] Local ranking script
 
 ### Logic
 

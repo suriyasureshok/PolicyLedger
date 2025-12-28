@@ -1,11 +1,33 @@
 """
-Agent Runner - Orchestration Module
+runner.py
 
-Glue everything together without owning logic.
-This is the student submitting answer sheet + claimed marks.
+Orchestrates the complete agent training and policy submission workflow.
+
+Detailed description:
+- Provides the main entry point for agent training
+- Coordinates environment setup, training, and policy extraction
+- Produces verifiable policy claims for submission
+- Saves policy artifacts for later reuse
+
+Main Components:
+- PolicyClaim: Data structure for policy submissions
+- run_agent(): Main training orchestration function
+- evaluate_policy(): Greedy policy evaluation
+- quick_train(): Convenience training function
+
+Dependencies:
+- src.shared.env: EnergySlotEnv for training environment
+- src.agent.trainer: Q-learning training functions
+- src.agent.policy: Policy extraction and serialization
+- src.agent.state: State discretization
+
+Author: PolicyLedger Team
+Created: 2025-12-28
 """
 
 from typing import NamedTuple
+import json
+from pathlib import Path
 from src.shared.env import EnergySlotEnv
 from src.shared.config import (
     DEFAULT_EPISODES,
@@ -21,15 +43,22 @@ from src.agent.state import discretize_state
 class PolicyClaim(NamedTuple):
     """
     Policy claim submitted by agent.
-    
+
     This is what the agent produces - nothing more, nothing less.
+
+    Attributes:
+        agent_id: Unique identifier for this agent
+        env_id: Environment configuration identifier (based on seed)
+        policy_hash: SHA-256 hash of policy artifact
+        policy_artifact: Serialized policy
+        claimed_reward: Agent's claimed average reward
     """
     agent_id: str  # Unique identifier for this agent
     env_id: str  # Environment configuration identifier (based on seed)
     policy_hash: str  # SHA-256 hash of policy artifact
     policy_artifact: bytes  # Serialized policy
     claimed_reward: float  # Agent's claimed average reward
-    
+
     def __repr__(self) -> str:
         return (
             f"PolicyClaim(\n"
@@ -44,16 +73,16 @@ class PolicyClaim(NamedTuple):
 def evaluate_policy(env: EnergySlotEnv, policy: Policy) -> float:
     """
     Evaluate a deterministic policy by running it greedily in the environment.
-    
+
     This produces the reward that should be claimed (and verifiable).
-    
+
     Args:
         env: Environment instance
         policy: Deterministic policy {state: action}
-    
+
     Returns:
         Total reward from running policy greedily
-    
+
     Rules:
         - No exploration (greedy only)
         - Single evaluation run
@@ -61,27 +90,27 @@ def evaluate_policy(env: EnergySlotEnv, policy: Policy) -> float:
     """
     # Reset environment
     state_dict = env.reset()
-    
+
     # Accumulate reward
     total_reward = 0.0
-    
+
     # Run episode
     while not env.done:
         # Discretize state
         state_tuple = discretize_state(state_dict)
-        
+
         # Get action from policy (greedy)
         if state_tuple not in policy:
             raise ValueError(f"Policy incomplete: missing action for state {state_tuple}")
-        
+
         action = policy[state_tuple]
-        
+
         # Take action
         state_dict, reward, done = env.step(action)
-        
+
         # Accumulate reward
         total_reward += reward
-    
+
     return total_reward
 
 
@@ -95,7 +124,7 @@ def run_agent(
 ) -> PolicyClaim:
     """
     Run agent training and produce policy claim.
-    
+
     This is the complete agent workflow:
     1. Create environment (with seed for reproducibility)
     2. Train policy using Q-learning
@@ -103,7 +132,7 @@ def run_agent(
     4. Serialize policy artifact
     5. Generate policy hash
     6. Create and return PolicyClaim
-    
+
     Args:
         agent_id: Unique identifier for this agent
         seed: Random seed for environment (for reproducibility)
@@ -111,10 +140,10 @@ def run_agent(
         time_slots: Environment time horizon
         battery_capacity: Battery capacity
         energy_cost: Energy cost per USE action
-    
+
     Returns:
         PolicyClaim containing all artifacts and claimed performance
-    
+
     Rules:
         - Does NOT verify reward
         - Does NOT store to ledger
@@ -129,28 +158,28 @@ def run_agent(
         energy_cost=energy_cost,
         seed=seed
     )
-    
+
     # Generate environment ID (identifies configuration)
     env_id = f"energy_slot_env_seed_{seed}_slots_{time_slots}"
-    
+
     # Train policy
     q_table, avg_training_reward = train(env, episodes)
-    
+
     # Extract deterministic policy
     policy = extract_policy(q_table)
-    
+
     # CRITICAL: Evaluate the final policy to get claimable reward
     # This must match what the verifier will compute during replay
     # The average training reward includes exploration and early learning,
     # but the verifier runs the greedy policy, so we must claim that reward.
     claimed_reward = evaluate_policy(env, policy)
-    
+
     # Serialize policy
     policy_bytes = serialize_policy(policy)
-    
+
     # Generate policy hash
     policy_hash_str = hash_policy(policy_bytes)
-    
+
     # Create policy claim
     claim = PolicyClaim(
         agent_id=agent_id,
@@ -159,14 +188,55 @@ def run_agent(
         policy_artifact=policy_bytes,
         claimed_reward=claimed_reward  # Use evaluated reward, not training average
     )
-    
+
+    # Save policy artifact to disk for reuse
+    _save_policy_artifact(policy_hash_str, policy, claimed_reward, agent_id)
+
     return claim
+
+
+def _save_policy_artifact(policy_hash: str, policy: Policy, reward: float, agent_id: str):
+    """
+    Save policy artifact to disk for later reuse.
+
+    Args:
+        policy_hash: Hash of the policy
+        policy: Policy dictionary
+        reward: Claimed reward
+        agent_id: Agent ID
+    """
+    policies_dir = Path("policies")
+    policies_dir.mkdir(exist_ok=True)
+
+    # Convert policy to serializable format
+    serializable_policy = {str(k): v for k, v in policy.items()}
+
+    artifact = {
+        "policy": serializable_policy,
+        "metadata": {
+            "agent_id": agent_id,
+            "claimed_reward": reward,
+            "policy_hash": policy_hash
+        }
+    }
+
+    artifact_path = policies_dir / f"{policy_hash}.json"
+    with open(artifact_path, 'w') as f:
+        json.dump(artifact, f, indent=2)
 
 
 def quick_train(agent_id: str = "agent_001", seed: int = 42, episodes: int = 500) -> PolicyClaim:
     """
     Convenience function for quick testing.
-    
+
     Uses default environment parameters with custom episodes.
+
+    Args:
+        agent_id: Unique identifier for this agent
+        seed: Random seed for environment (for reproducibility)
+        episodes: Number of training episodes
+
+    Returns:
+        PolicyClaim containing all artifacts and claimed performance
     """
     return run_agent(agent_id=agent_id, seed=seed, episodes=episodes)

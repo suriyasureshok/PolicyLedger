@@ -1,8 +1,26 @@
 """
-Q-Learning Training Engine
+trainer.py
 
-Implements Q-learning algorithm for energy scheduling.
-This is the student studying alone - no verification, no comparison.
+Q-learning training implementation for energy scheduling agent.
+
+Detailed description:
+- Implements standard Q-learning algorithm with epsilon-greedy exploration
+- Trains policies for optimal energy storage decisions
+- Provides complete training pipeline from initialization to convergence
+
+Main Components:
+- initialize_q_table(): Q-table creation
+- select_action(): Epsilon-greedy action selection
+- update_q_value(): Q-learning update rule
+- train_episode(): Single episode training
+- train(): Complete training pipeline
+
+Dependencies:
+- src.shared.config: Q-learning hyperparameters (ALPHA, GAMMA, EPSILON_*)
+- src.agent.state: State discretization function
+
+Author: PolicyLedger Team
+Created: 2025-12-28
 """
 
 from typing import Dict, Tuple
@@ -20,17 +38,18 @@ ACTIONS = [ACTION_SAVE, ACTION_USE]
 def initialize_q_table() -> Dict[Tuple[Tuple[int, int, int], int], float]:
     """
     Create an empty Q-table.
-    
+
     Structure: {(state, action): q_value}
     where state is a tuple (time_bucket, battery_bucket, demand)
-    
+
     Returns:
         Empty dictionary that will be populated during training.
-    
+
     Rules:
         - Does NOT assume fixed state space
         - Does NOT pre-fill everything
         - Lazy initialization: states added as encountered
+        - Memory efficient for large state spaces
     """
     return {}
 
@@ -42,21 +61,23 @@ def select_action(
 ) -> int:
     """
     Select action using epsilon-greedy strategy.
-    
-    This is the explore vs exploit decision.
-    
+
+    This is the explore vs exploit decision that balances learning
+    and exploitation of known good actions.
+
     Args:
-        state: Discrete state tuple
-        q_table: Current Q-table
-        epsilon: Current exploration rate
-    
+        state: Discrete state tuple (time_bucket, battery_bucket, demand)
+        q_table: Current Q-table mapping (state, action) to Q-values
+        epsilon: Current exploration rate (0.0 to 1.0)
+
     Returns:
         Selected action (0=SAVE or 1=USE)
-    
+
     Rules:
         - Does NOT update Q-values
         - Does NOT look ahead
-        - Simple epsilon-greedy, period
+        - Simple epsilon-greedy with random tie-breaking
+        - Exploration probability decreases over training
     """
     # Exploration: random action
     if random.random() < epsilon:
@@ -83,21 +104,25 @@ def update_q_value(
 ) -> None:
     """
     Apply Q-learning update rule.
-    
+
     Q(s,a) ← Q(s,a) + α[r + γ·max_a' Q(s',a') - Q(s,a)]
-    
+
+    This implements the temporal difference learning update that
+    propagates reward information backwards through the state space.
+
     Args:
         q_table: Q-table to update (modified in-place)
-        state: Current state
-        action: Action taken
-        reward: Reward received
-        next_state: Resulting state
-        done: Whether episode terminated
-    
+        state: Current state tuple
+        action: Action taken in current state
+        reward: Immediate reward received
+        next_state: Resulting state after action
+        done: Whether episode terminated (no future rewards)
+
     Rules:
         - Does NOT change environment
         - Does NOT store episode-level stats
-        - Pure Q-learning update
+        - Pure Q-learning update with standard TD(0) formula
+        - Handles terminal states correctly (max_next_q = 0)
     """
     # Current Q-value (default to 0 if not seen)
     current_q = q_table.get((state, action), 0.0)
@@ -119,21 +144,23 @@ def update_q_value(
 def train_episode(env, q_table: Dict, epsilon: float) -> float:
     """
     Run one full training episode.
-    
-    This is one practice exam.
-    
+
+    This is one practice exam where the agent learns from experience
+    by interacting with the environment and updating its Q-values.
+
     Args:
-        env: Environment instance
-        q_table: Q-table to update
-        epsilon: Current exploration rate
-    
+        env: Environment instance with reset() and step() methods
+        q_table: Q-table to update during episode
+        epsilon: Current exploration rate for action selection
+
     Returns:
         Total reward accumulated in this episode
-    
+
     Rules:
         - Does NOT reset env multiple times
         - Does NOT aggregate across episodes
         - Single episode: reset → loop → done
+        - Updates Q-table in-place during episode
     """
     # Reset environment
     env_state = env.reset()
@@ -167,19 +194,23 @@ def train(env, episodes: int) -> Tuple[Dict, float]:
     """
     Train agent for specified number of episodes.
     
-    This is the full study session.
+    This is the full study session where the agent learns an optimal
+    policy through repeated interaction with the environment.
     
     Args:
-        env: Environment instance
+        env: Environment instance for training
         episodes: Number of episodes to train
     
     Returns:
-        Tuple of (trained_q_table, average_reward)
+        Tuple of (trained_q_table, average_reward) where:
+        - trained_q_table: Complete Q-table after training
+        - average_reward: Mean reward across all training episodes
     
     Rules:
         - Does NOT serialize policy
         - Does NOT submit results
         - Just trains and returns artifacts
+        - Uses exponential epsilon decay for exploration
     """
     q_table = initialize_q_table()
     epsilon = EPSILON_START
