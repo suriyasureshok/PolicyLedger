@@ -208,12 +208,14 @@
 
 ### Fallback
 
-* [ ] Local append-only JSON ledger
-* [ ] Hash-chained entries
+* [x] Local append-only JSON ledger
+* [x] Hash-chained entries
 
 🚫 No wallets
 🚫 No tokens
 🚫 No crypto buzzwords
+
+✅ **FALLBACK COMPLETE** - Ready for Google integration
 
 ---
 
