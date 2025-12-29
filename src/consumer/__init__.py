@@ -23,5 +23,6 @@ Created: 2025-12-28
 """
 
 from .reuse import PolicyConsumer, BaselinePolicy, reuse_best_policy
+from .stats import ExecutionStats
 
-__all__ = ["PolicyConsumer", "BaselinePolicy", "reuse_best_policy"]
+__all__ = ["PolicyConsumer", "BaselinePolicy", "reuse_best_policy", "ExecutionStats"]

@@ -37,6 +37,7 @@ import random
 from src.shared.env import EnergySlotEnv
 from src.agent.state import discretize_state
 from src.marketplace.ranking import BestPolicyReference
+from .stats import ExecutionStats
 
 
 class BaselinePolicy(Enum):
@@ -142,7 +143,7 @@ class PolicyConsumer:
         policy: Dict,
         episodes: int = 100,
         seed: Optional[int] = None
-    ) -> float:
+    ) -> ExecutionStats:
         """
         Execute policy in environment (no training).
         
@@ -152,7 +153,7 @@ class PolicyConsumer:
             seed: Random seed for reproducibility
             
         Returns:
-            Average reward over episodes
+            ExecutionStats with reward and behavior metrics
             
         Design:
             - Deterministic execution (if seed provided)
@@ -165,33 +166,79 @@ class PolicyConsumer:
         """
         env = EnergySlotEnv(seed=seed)
         total_reward = 0.0
+        total_actions = 0
+        save_count = 0
+        use_count = 0
+        total_battery = 0.0
+        battery_readings = 0
+        survived_episodes = 0
         
         for _ in range(episodes):
             state = env.reset()
             episode_reward = 0.0
             done = False
+            episode_actions = 0
+            episode_save = 0
+            episode_use = 0
+            episode_battery = 0.0
+            episode_battery_count = 0
             
             while not done:
+                # Track battery
+                battery = state["battery_level"]
+                episode_battery += battery
+                episode_battery_count += 1
+                
                 # Discretize state (same as training)
                 discrete_state = discretize_state(state)
                 
                 # Look up action in policy (greedy)
                 action = policy.get(str(discrete_state), 0)  # Default to SAVE if unseen
                 
+                # Count actions
+                episode_actions += 1
+                if action == 0:  # SAVE
+                    episode_save += 1
+                elif action == 1:  # USE
+                    episode_use += 1
+                
                 # Execute action
                 state, reward, done = env.step(action)
                 episode_reward += reward
             
+            # Episode stats
             total_reward += episode_reward
+            total_actions += episode_actions
+            save_count += episode_save
+            use_count += episode_use
+            total_battery += episode_battery
+            battery_readings += episode_battery_count
+            
+            # Survival: if done by reaching time_slots (not battery exhaustion)
+            if done and state["battery_level"] > 0:  # Assuming done and battery >0 means survived
+                survived_episodes += 1
         
-        return total_reward / episodes
+        # Compute averages
+        avg_reward = total_reward / episodes
+        save_percentage = save_count / total_actions if total_actions > 0 else 0
+        use_percentage = use_count / total_actions if total_actions > 0 else 0
+        avg_battery = total_battery / battery_readings if battery_readings > 0 else 0
+        survival_rate = survived_episodes / episodes
+        
+        return ExecutionStats(
+            avg_reward=avg_reward,
+            save_percentage=save_percentage,
+            use_percentage=use_percentage,
+            avg_battery=avg_battery,
+            survival_rate=survival_rate
+        )
     
     def execute_baseline(
         self,
         baseline: BaselinePolicy,
         episodes: int = 100,
         seed: Optional[int] = None
-    ) -> float:
+    ) -> ExecutionStats:
         """
         Execute baseline policy for performance comparison.
 
@@ -204,20 +251,35 @@ class PolicyConsumer:
             seed: Random seed for environment reproducibility
 
         Returns:
-            Average reward across all episodes
+            ExecutionStats for the baseline
 
         Raises:
             ValueError: If baseline type is not recognized
         """
         env = EnergySlotEnv(seed=seed)
         total_reward = 0.0
+        total_actions = 0
+        save_count = 0
+        use_count = 0
+        total_battery = 0.0
+        battery_readings = 0
+        survived_episodes = 0
         
         for _ in range(episodes):
             state = env.reset()
             episode_reward = 0.0
             done = False
+            episode_actions = 0
+            episode_save = 0
+            episode_use = 0
+            episode_battery = 0.0
+            episode_battery_count = 0
             
             while not done:
+                battery = state["battery_level"]
+                episode_battery += battery
+                episode_battery_count += 1
+                
                 # Select action based on baseline strategy
                 if baseline == BaselinePolicy.RANDOM:
                     action = random.choice([0, 1])  # Random
@@ -228,12 +290,38 @@ class PolicyConsumer:
                 else:
                     raise ValueError(f"Unknown baseline: {baseline}")
                 
+                episode_actions += 1
+                if action == 0:
+                    episode_save += 1
+                elif action == 1:
+                    episode_use += 1
+                
                 state, reward, done = env.step(action)
                 episode_reward += reward
             
             total_reward += episode_reward
+            total_actions += episode_actions
+            save_count += episode_save
+            use_count += episode_use
+            total_battery += episode_battery
+            battery_readings += episode_battery_count
+            
+            if done and state["battery_level"] > 0:
+                survived_episodes += 1
         
-        return total_reward / episodes
+        avg_reward = total_reward / episodes
+        save_percentage = save_count / total_actions if total_actions > 0 else 0
+        use_percentage = use_count / total_actions if total_actions > 0 else 0
+        avg_battery = total_battery / battery_readings if battery_readings > 0 else 0
+        survival_rate = survived_episodes / episodes
+        
+        return ExecutionStats(
+            avg_reward=avg_reward,
+            save_percentage=save_percentage,
+            use_percentage=use_percentage,
+            avg_battery=avg_battery,
+            survival_rate=survival_rate
+        )
     
     def compare_with_baseline(
         self,
@@ -241,7 +329,7 @@ class PolicyConsumer:
         baseline: BaselinePolicy = BaselinePolicy.RANDOM,
         episodes: int = 100,
         seed: Optional[int] = None
-    ) -> Tuple[float, float, float]:
+    ) -> Tuple[ExecutionStats, ExecutionStats, float]:
         """
         Compare reused policy against baseline.
         
@@ -252,7 +340,7 @@ class PolicyConsumer:
             seed: Random seed
             
         Returns:
-            Tuple of (policy_reward, baseline_reward, improvement)
+            Tuple of (policy_stats, baseline_stats, improvement_percentage)
             
         Purpose:
             THE WOW MOMENT.
@@ -263,23 +351,19 @@ class PolicyConsumer:
             "Baseline (random): 5.0"
             "Improvement: 200%"
         """
-        policy_reward = self.execute_policy(policy, episodes, seed)
-        baseline_reward = self.execute_baseline(baseline, episodes, seed)
+        policy_stats = self.execute_policy(policy, episodes, seed)
+        baseline_stats = self.execute_baseline(baseline, episodes, seed)
         
         # Calculate improvement percentage
-        if baseline_reward > 0:
-            improvement = ((policy_reward - baseline_reward) / baseline_reward) * 100
-        elif baseline_reward < 0 and policy_reward > 0:
+        if baseline_stats.avg_reward > 0:
+            improvement = ((policy_stats.avg_reward - baseline_stats.avg_reward) / baseline_stats.avg_reward) * 100
+        elif baseline_stats.avg_reward < 0 and policy_stats.avg_reward > 0:
             # Policy went from negative to positive - infinite improvement
             improvement = float('inf')
-        elif baseline_reward < 0 and policy_reward <= 0:
-            # Both negative - improvement is relative to baseline magnitude
-            improvement = ((policy_reward - baseline_reward) / abs(baseline_reward)) * 100
         else:
-            # Both non-negative or baseline is zero
             improvement = 0.0
         
-        return policy_reward, baseline_reward, improvement
+        return policy_stats, baseline_stats, improvement
 
 
 # Convenience function for simple use cases
@@ -320,7 +404,7 @@ def reuse_best_policy(
     policy = consumer.load_policy(best_policy_ref.policy_hash)
     
     # Compare with baseline
-    policy_reward, baseline_reward, improvement = consumer.compare_with_baseline(
+    policy_stats, baseline_stats, improvement = consumer.compare_with_baseline(
         policy, baseline, episodes, seed
     )
     
@@ -328,8 +412,8 @@ def reuse_best_policy(
         "policy_hash": best_policy_ref.policy_hash,
         "agent_id": best_policy_ref.agent_id,
         "verified_reward": best_policy_ref.verified_reward,
-        "policy_reward": policy_reward,
-        "baseline_reward": baseline_reward,
+        "policy_reward": policy_stats.avg_reward,
+        "baseline_reward": baseline_stats.avg_reward,
         "improvement": improvement,
         "baseline_type": baseline.value,
         "episodes": episodes

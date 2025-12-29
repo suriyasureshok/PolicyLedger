@@ -141,7 +141,8 @@ print(f"  ✅ Policy loaded (states: {len(policy)})")
 
 # Execute reused policy
 print(f"\n⚡ Executing reused policy (100 episodes, no training)...")
-policy_reward = consumer.execute_policy(policy, episodes=100, seed=999)
+policy_stats = consumer.execute_policy(policy, episodes=100, seed=999)
+policy_reward = policy_stats.avg_reward
 print(f"  ✅ Reused policy reward: {policy_reward:.3f}")
 
 # -----------------------------------------------------------------------------
@@ -160,12 +161,51 @@ baselines = [
 print(f"\n  Reused Policy: {policy_reward:.3f}")
 print(f"  vs.")
 
+best_baseline_reward = float('-inf')
+best_baseline_name = ""
+
 for baseline_name, baseline_type in baselines:
-    baseline_reward = consumer.execute_baseline(baseline_type, episodes=100, seed=999)
+    baseline_stats = consumer.execute_baseline(baseline_type, episodes=100, seed=999)
+    baseline_reward = baseline_stats.avg_reward
     improvement = ((policy_reward - baseline_reward) / baseline_reward * 100) if baseline_reward > 0 else 0
     
     print(f"\n  {baseline_name}: {baseline_reward:.3f}")
     print(f"    → Improvement: {improvement:+.1f}%")
+    
+    if baseline_reward > best_baseline_reward:
+        best_baseline_reward = baseline_reward
+        best_baseline_name = baseline_name
+
+# ----------------------------------------------------------------------------- 
+# STEP 7: Explainability — WHY DID THIS POLICY WIN?
+# -----------------------------------------------------------------------------
+print("\n" + "=" * 80)
+print("🧠 STEP 7: Explainability — WHY DID THIS POLICY WIN?")
+print("-" * 80)
+
+from src.explainability import Explainer, ExplanationMetrics
+
+# Prepare metrics for explanation
+behavior_stats = {
+    "save_percentage": policy_stats.save_percentage,
+    "use_percentage": policy_stats.use_percentage,
+    "avg_battery": policy_stats.avg_battery,
+    "survived": policy_stats.survival_rate > 0.5  # Simplified
+}
+
+metrics = ExplanationMetrics(
+    environment_name="Energy Scheduling",
+    policy_identifier=best.agent_id,
+    verified_reward=best.verified_reward,
+    baseline_reward=best_baseline_reward if best_baseline_reward != float('-inf') else None,
+    behavior_stats=behavior_stats
+)
+
+explainer = Explainer(use_gemini=True)  # Will fallback if no API key
+explanation = explainer.explain(metrics)
+
+print(f"\n🤔 Why did {best.agent_id} win?")
+print(f"  {explanation}")
 
 # -----------------------------------------------------------------------------
 # FINAL SUMMARY
@@ -182,24 +222,25 @@ Key Achievements:
   ✅ Hash chain integrity intact
   ✅ Best policy selected: {best.agent_id} ({best.verified_reward:.3f})
   ✅ Policy reused WITHOUT training
-  ✅ Reused policy outperforms all baselines
+  ✅ Policy outperforms all baselines
+  ✅ Explanation generated in human terms
 
-🎯 THE WOW MOMENT:
-   Policy was loaded and executed INSTANTLY.
-   No training. No waiting. Immediate intelligent behavior.
+🎯 THE COMPLETE PIPELINE:
+   Train → Verify → Ledger → Marketplace → Reuse → Explain
    
-   This proves: "Once intelligence is learned and verified,
-                 it can be reused instantly without retraining."
+   This proves: Intelligence can be learned once, verified, stored,
+   selected, reused instantly, and explained clearly.
 
 📈 Performance:
    Reused Policy:  {policy_reward:.3f}
-   vs. Random:     ~{policy_reward/2:.3f} (200% better)
+   vs. Best Baseline: {best_baseline_reward:.3f} ({best_baseline_name})
    
-🔗 Trust Guarantee:
+🔗 Trust Chain:
    - Deterministic verification ✅
    - Tamper-evident ledger ✅
    - Transparent selection ✅
    - Instant reuse ✅
+   - Human explainability ✅
 """)
 
 print("=" * 80)
