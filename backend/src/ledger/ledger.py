@@ -31,7 +31,7 @@ TODO: Google Cloud Integration
 - Cloud Logging: Audit all ledger operations with structured logs
 """
 
-from typing import List, NamedTuple, Optional
+from typing import List, NamedTuple, Optional, Dict
 from datetime import datetime
 import hashlib
 import json
@@ -53,6 +53,7 @@ class LedgerEntry(NamedTuple):
         timestamp: ISO 8601 formatted timestamp of verification
         previous_hash: SHA-256 hash of the previous ledger entry (or "genesis")
         current_hash: SHA-256 hash of this entry for chain verification
+        env_config: Environment configuration used for training (optional for backward compatibility)
 
     Note:
         This structure contains ONLY verified information - no training metadata,
@@ -65,6 +66,7 @@ class LedgerEntry(NamedTuple):
     timestamp: str
     previous_hash: str
     current_hash: str
+    env_config: Optional[Dict] = None
     
     def __repr__(self) -> str:
         return (
@@ -249,7 +251,8 @@ class PolicyLedger:
         self,
         policy_hash: str,
         verified_reward: float,
-        agent_id: str
+        agent_id: str,
+        env_config: Optional[Dict] = None
     ) -> LedgerEntry:
         """
         Append a verified policy claim to the ledger.
@@ -269,6 +272,7 @@ class PolicyLedger:
             policy_hash: SHA-256 hash of the verified policy artifact
             verified_reward: Reward value confirmed by verification layer
             agent_id: Unique identifier of the agent that created the policy
+            env_config: Environment configuration used for training (optional)
 
         Returns:
             The newly created LedgerEntry with all computed fields
@@ -302,7 +306,8 @@ class PolicyLedger:
             agent_id=agent_id,
             timestamp=timestamp,
             previous_hash=previous_hash,
-            current_hash=current_hash
+            current_hash=current_hash,
+            env_config=env_config
         )
         
         # Append to memory

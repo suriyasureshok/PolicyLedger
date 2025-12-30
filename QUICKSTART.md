@@ -1,249 +1,203 @@
-# 🚀 PolicyLedger Quick Start Guide
+# PolicyLedger Quick Start Guide
 
-## Overview
-PolicyLedger is a decentralized RL policy marketplace with:
-- **Backend**: FastAPI REST API (Python)
-- **Frontend**: React + Vite dashboard
-- **Core**: Policy training, verification, ledger, and marketplace
+**Get PolicyLedger running in under 5 minutes**
 
 ---
 
-## 🎯 Quick Start
+## 📋 Prerequisites
 
-### Option 1: Start Everything (Recommended)
-```powershell
-.\start.ps1
-```
-This will:
-- Start backend on `http://localhost:8000`
-- Start frontend on `http://localhost:5173`
-- Open in separate windows
+- ✅ **Python 3.10 or higher** ([Download](https://www.python.org/downloads/))
+- ✅ **Node.js 18+ and npm** ([Download](https://nodejs.org/))
+- ✅ **Git** ([Download](https://git-scm.com/))
 
-### Option 2: Backend Only
-```powershell
-.\start-backend.ps1
+**Check versions**:
+```bash
+python --version  # Should be 3.10+
+node --version    # Should be 18+
+npm --version     # Should be 9+
 ```
-Or manually:
-```powershell
-.\.venv\Scripts\Activate.ps1
-python main.py
-```
-
-### Option 3: Run Demo Script
-```powershell
-.\.venv\Scripts\Activate.ps1
-python demo.py
-```
-Demonstrates the complete workflow with 6 agents.
 
 ---
 
-## 📡 API Endpoints
+## 🚀 Installation
 
-### Training & Verification
-- `POST /agent/train` - Train a new agent
-- `POST /agent/verify/{agent_id}` - Verify policy claim
-- `POST /ledger/add/{agent_id}` - Add verified policy to ledger
+### 1. Clone Repository
 
-### Marketplace
-- `GET /marketplace` - Get ranked policies
-- `GET /marketplace/best` - Get best policy
+```bash
+git clone https://github.com/your-org/PolicyLedger.git
+cd PolicyLedger
+```
 
-### Consumer
-- `POST /consumer/reuse` - Reuse best policy (zero-training)
+### 2. Backend Setup
 
-### System
-- `GET /ledger` - View all ledger entries
-- `GET /ledger/integrity` - Check hash chain integrity
-- `GET /stats` - System statistics
-- `GET /health` - Health check
-- `DELETE /reset` - Reset system (demo only)
+```bash
+cd backend
+pip install -r requirements.txt
+```
 
-### API Documentation
-Interactive docs available at: `http://localhost:8000/docs`
+### 3. Frontend Setup
 
----
-
-## 🎨 Frontend Integration
-
-Frontend is located in: `frontend/policy-ledger-insights/`
-
-### Setup Frontend
 ```bash
 cd frontend/policy-ledger-insights
 npm install
+```
+
+---
+
+## ▶️ Running the Application
+
+### Start Backend
+
+```bash
+cd backend
+python start_server.py
+```
+
+**Backend running at**: `http://localhost:8000`
+
+### Start Frontend (New Terminal)
+
+```bash
+cd frontend/policy-ledger-insights
 npm run dev
 ```
 
-### Environment Configuration
-Create `frontend/policy-ledger-insights/.env`:
-```
-VITE_API_URL=http://localhost:8000
-```
+**Frontend running at**: `http://localhost:5173`
 
 ---
 
-## 📊 Example Workflow
+## 🎯 First Steps
 
-### Using API (cURL)
+### 1. Access Web Interface
+
+Open: **http://localhost:5173**
+
+### 2. Try Live Training
+
+1. Click **"Live Training"**
+2. Configure parameters (Episodes: 500, Seed: 42)
+3. Click **"Start Training"**
+4. Watch real-time metrics
+
+### 3. Explore Ledger
+
+Navigate to **"Ledger"** to view verified policies
+
+### 4. Check Marketplace
+
+Go to **"Marketplace"** to see policy rankings
+
+---
+
+## 🧪 Testing
+
+### API Test
+
 ```bash
-# 1. Train agent
-curl -X POST http://localhost:8000/agent/train \
-  -H "Content-Type: application/json" \
-  -d '{"agent_id": "agent_001", "seed": 42, "episodes": 150}'
-
-# 2. Verify agent
-curl -X POST http://localhost:8000/agent/verify/agent_001
-
-# 3. Add to ledger
-curl -X POST http://localhost:8000/ledger/add/agent_001
-
-# 4. Get marketplace rankings
-curl http://localhost:8000/marketplace
-
-# 5. Reuse best policy
-curl -X POST http://localhost:8000/consumer/reuse
+curl http://localhost:8000/health
 ```
 
-### Using Python
-```python
-import requests
+### Run Demo
 
-BASE_URL = "http://localhost:8000"
-
-# Train agent
-response = requests.post(f"{BASE_URL}/agent/train", json={
-    "agent_id": "agent_001",
-    "seed": 42,
-    "episodes": 150
-})
-print(response.json())
-
-# Verify
-response = requests.post(f"{BASE_URL}/agent/verify/agent_001")
-print(response.json())
-
-# Add to ledger
-response = requests.post(f"{BASE_URL}/ledger/add/agent_001")
-print(response.json())
-
-# Get best policy
-response = requests.get(f"{BASE_URL}/marketplace/best")
-print(response.json())
-
-# Reuse policy
-response = requests.post(f"{BASE_URL}/consumer/reuse")
-print(response.json())
+```bash
+cd backend
+python demo.py
 ```
+
+This runs the complete workflow (30-60 seconds).
 
 ---
 
-## 🗂️ Project Structure
+## 📁 Project Structure
 
 ```
 PolicyLedger/
-├── main.py                     # FastAPI backend
-├── demo.py                     # Complete demo script
-├── start.ps1                   # Start both frontend & backend
-├── start-backend.ps1           # Start backend only
-├── ledger.json                 # Blockchain ledger
-├── policies/                   # Stored policy artifacts
-├── src/                        # Core modules
-│   ├── agent/                  # RL agent training
-│   ├── verifier/               # Policy verification
-│   ├── ledger/                 # Tamper-evident ledger
-│   ├── marketplace/            # Policy ranking
-│   ├── consumer/               # Policy reuse
-│   └── shared/                 # Shared utilities
-├── frontend/
-│   └── policy-ledger-insights/ # React dashboard
-└── docs/                       # Documentation
+├── backend/              # Python FastAPI backend
+│   ├── src/
+│   │   ├── agent/       # RL training
+│   │   ├── verifier/    # Policy verification
+│   │   ├── ledger/      # Storage
+│   │   └── marketplace/ # Ranking
+│   └── main.py          # API server
+├── frontend/            # React + TypeScript frontend
+│   └── policy-ledger-insights/
+└── docs/                # Documentation
 ```
 
 ---
 
-## 🔒 Key Features
+## 🐛 Troubleshooting
 
-### 1. Decentralized Learning
-- Agents train independently
-- No coordination required
-- Different seeds produce different policies
+### Backend Won't Start
 
-### 2. Deterministic Verification
-- Verifier replays policy
-- Confirms claimed rewards
-- Rejects fraudulent claims
+```bash
+# Reinstall dependencies
+cd backend
+pip install -r requirements.txt
+```
 
-### 3. Tamper-Evident Ledger
-- Hash-chained entries
-- Immutable record
-- Integrity verification
+### Frontend Won't Start
 
-### 4. Policy Marketplace
-- Ranks by verified reward
-- Tie-breaking by timestamp
-- Best policy selection
-
-### 5. Zero-Training Reuse
-- Consumer loads best policy
-- Instant deployment
-- No training required
-
----
-
-## 🛠️ Development
-
-### Install Dependencies
-```powershell
-# Backend
-pip install fastapi uvicorn pydantic
-
-# Frontend
+```bash
+# Reinstall dependencies
 cd frontend/policy-ledger-insights
+rm -rf node_modules package-lock.json
 npm install
 ```
 
-### Run Tests
+### Port Already in Use
+
+**Windows**:
 ```powershell
-pytest tests/
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
 ```
 
-### Reset System
+---
+
+## 📊 Key Commands
+
 ```bash
-curl -X DELETE http://localhost:8000/reset
+# Backend
+cd backend
+pip install -r requirements.txt      # Install
+python start_server.py               # Run server
+python demo.py                        # Demo workflow
+
+# Frontend
+cd frontend/policy-ledger-insights
+npm install                          # Install
+npm run dev                          # Run dev server
+npm run build                        # Build production
+
+# Testing
+curl http://localhost:8000/health    # Health check
+curl http://localhost:8000/docs      # API docs
 ```
 
 ---
 
-## 📝 Notes
+## ✅ Quick Start Checklist
 
-- **Ledger File**: `ledger.json` stores all verified policies
-- **Policy Storage**: `policies/` directory contains policy artifacts
-- **Demo Mode**: Use 150 episodes for fast demonstrations
-- **Production Mode**: Use 500+ episodes for better convergence
-
----
-
-## 🎯 Demo Presentation Tips
-
-1. **Start with demo.py**: Shows complete workflow
-2. **Show API docs**: Interactive Swagger UI at `/docs`
-3. **Frontend dashboard**: Visual representation of marketplace
-4. **Highlight**: Zero-training policy reuse (THE WOW MOMENT)
-5. **Explain**: Tamper-evident ledger (hash chain integrity)
+- [ ] Python 3.10+ installed
+- [ ] Node.js 18+ installed
+- [ ] Dependencies installed (backend + frontend)
+- [ ] Backend running on port 8000
+- [ ] Frontend running on port 5173
+- [ ] Web interface accessible
+- [ ] Demo completed successfully
+- [ ] Live training tested
 
 ---
 
-## 📚 Additional Resources
+## 🎓 Next Steps
 
-- [Architecture Documentation](docs/PHASE_4_ARCHITECTURE.md)
-- [API Documentation](http://localhost:8000/docs)
-- [Phase Completion Summaries](docs/)
+- 📖 Read [README.md](README.md) for project overview
+- 🏗️ Study [Architecture.md](Architecture.md) for technical details
+- ☁️ See [checklist.md](checklist.md) for Google Cloud deployment
 
 ---
 
-## 🤝 Support
+**You're all set! 🎉**
 
-For issues or questions, check the documentation in the `docs/` directory.
-
-**Good luck with your demo! 🚀**
+**Last Updated**: December 30, 2025

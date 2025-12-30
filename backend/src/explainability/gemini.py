@@ -58,27 +58,36 @@ class GeminiExplainer(BaseExplainer):
         baseline = metrics.baseline_reward
         stats = metrics.behavior_stats
 
-        prompt = f"You are explaining the behavior of a reinforcement learning policy to a non-technical judge. Do not mention algorithms, equations, or internal model details.\n\n"
-        prompt += f"In an {env} environment, a policy achieved a verified reward of {reward:.2f}"
+        prompt = f"You are explaining the behavior of a cybersecurity reinforcement learning policy to a technical audience. Focus on defensive strategy and threat response patterns.\n\n"
+        prompt += f"In a {env}, a policy achieved a verified reward of {reward:.2f}"
         if baseline is not None:
-            prompt += f", compared to a baseline reward of {baseline:.2f}"
+            diff = reward - baseline
+            if diff > 0:
+                prompt += f", which is {diff:.2f} points better than the average policy"
+            else:
+                prompt += f", which is {abs(diff):.2f} points below the average policy"
         prompt += ". "
 
-        # Add behavior stats
+        # Add behavior stats for cyber defense
         stat_desc = []
-        if "save_percentage" in stats:
-            stat_desc.append(f"used the SAVE action in {stats['save_percentage']*100:.0f}% of time slots")
-        if "use_percentage" in stats:
-            stat_desc.append(f"used the USE action in {stats['use_percentage']*100:.0f}% of time slots")
-        if "avg_battery" in stats:
-            stat_desc.append(f"maintained an average battery level of {stats['avg_battery']*100:.0f}%")
-        if "survived" in stats:
-            stat_desc.append("survived the full time horizon" if stats["survived"] else "did not survive the full time horizon")
+        if "ignore_percentage" in stats:
+            stat_desc.append(f"ignored {stats['ignore_percentage']*100:.0f}% of threats")
+        if "monitor_percentage" in stats:
+            stat_desc.append(f"monitored {stats['monitor_percentage']*100:.0f}% of situations")
+        if "rate_limit_percentage" in stats:
+            stat_desc.append(f"applied rate limiting {stats['rate_limit_percentage']*100:.0f}% of the time")
+        if "block_ip_percentage" in stats:
+            stat_desc.append(f"blocked IPs {stats['block_ip_percentage']*100:.0f}% of the time")
+        if "isolate_percentage" in stats:
+            stat_desc.append(f"isolated services {stats['isolate_percentage']*100:.0f}% of the time")
+        if "total_states_covered" in stats:
+            coverage = (stats["total_states_covered"] / 108) * 100 if stats["total_states_covered"] else 0
+            stat_desc.append(f"learned {stats['total_states_covered']} out of 108 possible attack scenarios ({coverage:.0f}% coverage)")
 
         if stat_desc:
             prompt += "The policy " + ", ".join(stat_desc) + ". "
 
-        prompt += "Explain why this policy performed as it did in simple terms."
+        prompt += "Explain in 2-3 sentences why this defensive strategy performed as it did, focusing on threat response patterns and security trade-offs. Be specific about what makes this policy effective or ineffective at protecting the system."
 
         return prompt
 

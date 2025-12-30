@@ -62,6 +62,7 @@ class TrainingState:
     replay_buffer: ExperienceReplay  # Experience replay buffer
     env: CyberDefenseEnv
     seed: int
+    env_config: Dict  # Environment configuration (time_horizon, difficulty, etc.)
 
 
 class LiveTrainingManager:
@@ -82,7 +83,8 @@ class LiveTrainingManager:
         seed: int,
         max_episodes: Optional[int],
         callback: Callable,
-        config: Dict
+        config: Dict,
+        env_type: str = "standard"
     ) -> None:
         """
         Start a new training session with real-time updates.
@@ -94,13 +96,21 @@ class LiveTrainingManager:
             callback: Async function to call with each update
             config: Training configuration (learning rate, epsilon, etc.)
         """
+        # Get environment configuration
+        from src.environments.env_presets import get_env_config
+        env_config = get_env_config(env_type)
+        
         print(f"🏁 Starting training for {agent_id}")
+        print(f"   Environment: {env_config.display_name} ({env_config.description})")
         print(f"   Seed: {seed}, Max Episodes: {max_episodes}")
         print(f"   Config: {config}")
         print(f"   🚀 Using Double Q-Learning with Experience Replay")
         
-        # Initialize environment
-        env = CyberDefenseEnv(seed=seed)
+        # Initialize environment with preset configuration
+        env = CyberDefenseEnv(
+            seed=seed,
+            time_horizon=env_config.time_horizon
+        )
         
         # Initialize Double Q-Learning tables
         q_table_a, q_table_b = initialize_double_q_tables()
@@ -128,7 +138,8 @@ class LiveTrainingManager:
             q_table_b=q_table_b,
             replay_buffer=replay_buffer,
             env=env,
-            seed=seed
+            seed=seed,
+            env_config=env_config.to_dict()
         )
         
         self.sessions[agent_id] = state
@@ -267,21 +278,31 @@ class LiveTrainingManager:
                         for state, action in policy.items()
                     }
                     
-                    with open(policy_path, 'w') as f:
-                        json.dump(serializable_policy, f, indent=2)
-                    
-                    # Calculate average reward for ledger
+                    # Calculate average reward for metadata
                     if state.metrics_history:
                         recent_rewards = [m.reward for m in state.metrics_history[-100:]]
-                        verified_reward = sum(recent_rewards) / len(recent_rewards)
+                        avg_reward = sum(recent_rewards) / len(recent_rewards)
                     else:
-                        verified_reward = 0.0
+                        avg_reward = 0.0
+                    
+                    # Create artifact with proper structure
+                    artifact = {
+                        "policy": serializable_policy,
+                        "metadata": {
+                            "agent_id": state.agent_id,
+                            "claimed_reward": avg_reward,
+                            "policy_hash": policy_hash
+                        }
+                    }
+                    
+                    with open(policy_path, 'w') as f:
+                        json.dump(artifact, f, indent=2)
                     
                     # Store for potential ledger addition
                     state.final_policy_hash = policy_hash
-                    state.final_reward = verified_reward
+                    state.final_reward = avg_reward
                     
-                    print(f"✓ Policy saved: {policy_hash[:16]}... (reward: {verified_reward:.2f})")
+                    print(f"✓ Policy saved: {policy_hash[:16]}... (reward: {avg_reward:.2f})")
                     
                 except Exception as e:
                     print(f"Error saving policy: {e}")

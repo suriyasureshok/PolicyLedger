@@ -178,8 +178,10 @@ class PolicyConsumer:
         system_health_sum = 0.0
         health_readings = 0
         survived_episodes = 0
+        policy_hits = 0
+        policy_misses = 0
         
-        for _ in range(episodes):
+        for ep in range(episodes):
             state = env.reset()
             episode_reward = 0.0
             done = False
@@ -192,9 +194,32 @@ class PolicyConsumer:
                 
                 # Discretize state (same as training)
                 discrete_state = discretize_state(state)
+                str_state = str(discrete_state)
                 
                 # Look up action in policy (greedy)
-                action = policy.get(str(discrete_state), 1)  # Default to MONITOR if unseen
+                if str_state in policy:
+                    action = policy[str_state]
+                    policy_hits += 1
+                else:
+                    # Use intelligent default based on state
+                    # discrete_state = (attack_severity, attack_type, system_health, alert_confidence, time_under_attack)
+                    attack_severity = discrete_state[0]
+                    system_health = discrete_state[2]
+                    alert_confidence = discrete_state[3]
+                    
+                    # Heuristic: respond proportionally to threat level
+                    if system_health == 2:  # CRITICAL health
+                        action = 4  # ISOLATE_SERVICE
+                    elif attack_severity == 2 and alert_confidence == 1:  # HIGH severity + HIGH confidence
+                        action = 3  # BLOCK_IP
+                    elif attack_severity >= 1:  # MEDIUM or HIGH severity
+                        action = 2  # RATE_LIMIT
+                    else:
+                        action = 1  # MONITOR for low severity
+                    
+                    policy_misses += 1
+                    if ep == 0 and policy_misses <= 3:  # Log first few misses in first episode
+                        print(f"  🔍 Unseen state: {str_state} -> using heuristic action {action}")
                 
                 # Count actions
                 episode_actions += 1
@@ -217,6 +242,15 @@ class PolicyConsumer:
         action_percentages = {k: v / total_actions if total_actions > 0 else 0 for k, v in action_counts.items()}
         avg_system_health = system_health_sum / health_readings if health_readings > 0 else 0
         survival_rate = survived_episodes / episodes
+        
+        # Log policy coverage
+        policy_coverage = policy_hits / (policy_hits + policy_misses) if (policy_hits + policy_misses) > 0 else 0
+        print(f"📊 Policy Reuse Stats:")
+        print(f"  Policy hits: {policy_hits}, misses: {policy_misses}")
+        print(f"  Coverage: {policy_coverage*100:.1f}%")
+        print(f"  Avg reward: {avg_reward:.3f}")
+        print(f"  Survival rate: {survival_rate*100:.1f}%")
+        print(f"  Policy size: {len(policy)} states")
         
         return ExecutionStats(
             avg_reward=avg_reward,
