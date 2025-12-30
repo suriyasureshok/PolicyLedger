@@ -1,0 +1,54 @@
+{
+  "ledger_version": "1.0",
+  "total_entries": 6,
+  "entries": [
+    {
+      "policy_hash": "4f89b6e2844b2ba370765833ce9f7bf9fd925ead2df42234a6d15d7a94479d4f",
+      "verified_reward": -11.799999999999999,
+      "agent_id": "agent_alpha",
+      "timestamp": "2025-12-30T16:55:46.435148",
+      "previous_hash": "genesis",
+      "current_hash": "1394b8d4ed5df4b37a7b665877d0f57c7b7675d3e3fd1f66ea2fb9449c701944"
+    },
+    {
+      "policy_hash": "9d2ca7529e32be8a6811ecb974d8017580843a0c3a97f4e9a63ed9c4e9990a8c",
+      "verified_reward": -11.799999999999999,
+      "agent_id": "agent_alpha",
+      "timestamp": "2025-12-30T16:56:09.201127",
+      "previous_hash": "1394b8d4ed5df4b37a7b665877d0f57c7b7675d3e3fd1f66ea2fb9449c701944",
+      "current_hash": "741a77dba0483566aac5a10e6b6def56759d1556e889149dc3955826d2f09443"
+    },
+    {
+      "policy_hash": "50784b383fc6a54f86fc2dff0714d6ab0ce9a2007368d94c2174c33bfc2458b2",
+      "verified_reward": 2.299999999999999,
+      "agent_id": "agent_delta",
+      "timestamp": "2025-12-30T16:56:09.204124",
+      "previous_hash": "741a77dba0483566aac5a10e6b6def56759d1556e889149dc3955826d2f09443",
+      "current_hash": "17dea33ac4cd08e5f52630ef1d4132bff6436ee9c6f79925f8c876e2a10c569b"
+    },
+    {
+      "policy_hash": "c656419b2e11528db803dd34a30f0eadca91413eacc842adc0d864763c35dde1",
+      "verified_reward": 7.0,
+      "agent_id": "agent_epsilon",
+      "timestamp": "2025-12-30T16:56:09.208626",
+      "previous_hash": "17dea33ac4cd08e5f52630ef1d4132bff6436ee9c6f79925f8c876e2a10c569b",
+      "current_hash": "c6f467eae2e3c555eb6c0578095d6cf55203c790c00c5c191bcbd94c19c746d1"
+    },
+    {
+      "policy_hash": "735e41635c814b1386669dec8a1eccce2da588fd9b7b123c80049507218bf2f3",
+      "verified_reward": -14.9,
+      "agent_id": "agent_zeta",
+      "timestamp": "2025-12-30T16:56:09.211615",
+      "previous_hash": "c6f467eae2e3c555eb6c0578095d6cf55203c790c00c5c191bcbd94c19c746d1",
+      "current_hash": "21a3277f28f04d839a4f428ff46b3a5c9324c5c2e8e4a7762dbaf8bb6910ed85"
+    },
+    {
+      "policy_hash": "d4aeb4117a876065d4be04dec128144d9f8f3b5a38cf9b902065167a225d0c1c",
+      "verified_reward": -11.799999999999999,
+      "agent_id": "agent_alpha",
+      "timestamp": "2025-12-30T17:00:34.731574",
+      "previous_hash": "21a3277f28f04d839a4f428ff46b3a5c9324c5c2e8e4a7762dbaf8bb6910ed85",
+      "current_hash": "ae1495779ea3ebbe845fbb2b570abe30918b807c93006ed3b4412bcf606b383f"
+    }
+  ]
+}

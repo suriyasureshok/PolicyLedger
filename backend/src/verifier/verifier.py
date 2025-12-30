@@ -17,6 +17,11 @@ PROPERTIES:
     - Deterministic
     - Skeptical
     - Stateless (per verification)
+
+TODO: Google Cloud Integration
+- Vertex AI Custom Jobs: Run verification in isolated containers
+- Cloud Build: Build verification images on policy submission
+- Cloud Logging: Structured verification audit logs
 """
 
 from typing import NamedTuple, Optional
@@ -26,7 +31,7 @@ import hashlib
 from src.agent.runner import PolicyClaim
 from src.agent.policy import deserialize_policy, Policy
 from src.agent.state import discretize_state
-from src.shared.env import EnergySlotEnv
+from src.environments.cyber_env import CyberDefenseEnv
 
 
 class VerificationStatus(Enum):
@@ -223,12 +228,12 @@ class PolicyVerifier:
         
         # Validate policy entries
         for state, action in policy.items():
-            # State must be tuple of 3 integers
-            if not isinstance(state, tuple) or len(state) != 3:
+            # State must be tuple of 5 integers for cyber defense environment
+            if not isinstance(state, tuple) or len(state) != 5:
                 raise ValueError(f"Invalid state format: {state}")
             
-            # Action must be 0 or 1
-            if action not in [0, 1]:
+            # Action must be 0-4 (IGNORE, MONITOR, RATE_LIMIT, BLOCK_IP, ISOLATE_SERVICE)
+            if action not in [0, 1, 2, 3, 4]:
                 raise ValueError(f"Invalid action: {action}")
         
         return policy
@@ -239,7 +244,7 @@ class PolicyVerifier:
     
     def _replay_policy(self, env_id: str, policy: Policy) -> float:
         """
-        Re-run environment using only the policy.
+        Re-run simulated cyber defense environment using only the policy.
         
         This is the heart of verification.
         
@@ -274,12 +279,12 @@ class PolicyVerifier:
             Exception if replay fails or policy is incomplete
         """
         # Parse environment ID to extract configuration
-        # Format: "energy_slot_env_seed_{seed}_slots_{time_slots}"
-        seed, time_slots = self._parse_env_id(env_id)
+        # Format: "cyber_defense_env_seed_{seed}_horizon_{time_horizon}"
+        seed, time_horizon = self._parse_env_id(env_id)
         
         # Create environment with exact same configuration
-        env = EnergySlotEnv(
-            time_slots=time_slots,
+        env = CyberDefenseEnv(
+            time_horizon=time_horizon,
             seed=seed
         )
         
@@ -289,7 +294,7 @@ class PolicyVerifier:
         # Accumulate total reward
         total_reward = 0.0
         steps = 0
-        max_steps = time_slots * 2  # Safety limit
+        max_steps = time_horizon * 2  # Safety limit
         
         # Replay loop
         while not env.done and steps < max_steps:
@@ -319,31 +324,31 @@ class PolicyVerifier:
         
         Args:
             env_id: Environment identifier
-                   Format: "energy_slot_env_seed_{seed}_slots_{time_slots}"
+                   Format: "cyber_defense_env_seed_{seed}_horizon_{time_horizon}"
         
         Returns:
-            (seed, time_slots)
+            (seed, time_horizon)
         
         Raises:
             ValueError if env_id format is invalid
         """
         try:
-            # Example: "energy_slot_env_seed_42_slots_24"
+            # Example: "cyber_defense_env_seed_42_horizon_24"
             parts = env_id.split("_")
             
             # Extract seed
             seed_idx = parts.index("seed") + 1
             seed = int(parts[seed_idx])
             
-            # Extract time_slots
-            slots_idx = parts.index("slots") + 1
-            time_slots = int(parts[slots_idx])
+            # Extract time_horizon
+            horizon_idx = parts.index("horizon") + 1
+            time_horizon = int(parts[horizon_idx])
             
-            return seed, time_slots
+            return seed, time_horizon
         except (ValueError, IndexError) as e:
             raise ValueError(f"Invalid environment ID format: {env_id}") from e
     
-    def _discretize_state(self, state_dict: dict) -> tuple[int, int, int]:
+    def _discretize_state(self, state_dict: dict) -> tuple:
         """
         Convert environment state dict to discretized state tuple.
         
@@ -353,11 +358,10 @@ class PolicyVerifier:
         to ensure state representation consistency.
         
         Args:
-            state_dict: State from environment
-                       {"time_slot": int, "battery_level": float, "demand": int}
+            state_dict: State from environment (cyber defense format)
         
         Returns:
-            (time_bucket, battery_bucket, demand)
+            Discretized state tuple (format depends on environment)
         """
         # Use the EXACT same discretization as training
         # This is critical for verification correctness

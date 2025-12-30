@@ -21,8 +21,14 @@ Dependencies:
 - pathlib: For file system operations
 - typing: For type hints and annotations
 
-Author: Your Name
+Author: PolicyLedger Team
 Created: 2025-12-28
+
+TODO: Google Cloud Integration
+- Firestore: Store ledger entries in append-only Firestore collection
+- Cloud Functions: Trigger on new entries to update marketplace ranking
+- Security Rules: Enforce append-only via Firestore security rules
+- Cloud Logging: Audit all ledger operations with structured logs
 """
 
 from typing import List, NamedTuple, Optional

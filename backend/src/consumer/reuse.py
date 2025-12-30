@@ -20,12 +20,17 @@ Dependencies:
 - typing: For type hints
 - enum: For BaselinePolicy enumeration
 - random: For baseline policy randomization
-- src.shared.env: EnergySlotEnv for simulation environment
+- src.environments.cyber_env: CyberDefenseEnv for simulated cyber defense
 - src.agent.state: discretize_state for state processing
 - src.marketplace.ranking: BestPolicyReference for policy selection
 
-Author: Your Name
+Author: PolicyLedger Team
 Created: 2025-12-28
+Updated: 2025-12-30 (cyber defense refactor)
+
+TODO: Google Cloud Integration
+- Cloud Storage: Fetch policies from GCS instead of local filesystem
+- Cloud Functions: Trigger policy execution on marketplace updates
 """
 
 import json
@@ -34,7 +39,7 @@ from typing import Dict, Tuple, Optional
 from enum import Enum
 import random
 
-from src.shared.env import EnergySlotEnv
+from src.environments.cyber_env import CyberDefenseEnv
 from src.agent.state import discretize_state
 from src.marketplace.ranking import BestPolicyReference
 from .stats import ExecutionStats
@@ -50,12 +55,14 @@ class BaselinePolicy(Enum):
 
     Attributes:
         RANDOM: Random action selection at each step
-        ALWAYS_SAVE: Always choose SAVE action
-        ALWAYS_USE: Always choose USE action
+        IGNORE_ALL: Always IGNORE alerts
+        BLOCK_ALL: Always BLOCK_IP for any alert
+        MONITOR_ONLY: Always MONITOR (minimal intervention)
     """
     RANDOM = "random"  # Random action at each step
-    ALWAYS_SAVE = "always_save"  # Always choose SAVE
-    ALWAYS_USE = "always_use"  # Always choose USE
+    IGNORE_ALL = "ignore_all"  # Always IGNORE alerts
+    BLOCK_ALL = "block_all"  # Always BLOCK_IP
+    MONITOR_ONLY = "monitor_only"  # Always MONITOR
 
 
 class PolicyConsumer:
@@ -145,7 +152,7 @@ class PolicyConsumer:
         seed: Optional[int] = None
     ) -> ExecutionStats:
         """
-        Execute policy in environment (no training).
+        Execute policy in simulated cyber defense environment (no training).
         
         Args:
             policy: State -> action mapping
@@ -161,16 +168,15 @@ class PolicyConsumer:
             - Same environment as training/verification
             
         Mental Model:
-            Execute topper's answers in exam.
-            No learning. Just follow the script.
+            Execute verified defense policy in simulation.
+            No learning. Just follow the decision rules.
         """
-        env = EnergySlotEnv(seed=seed)
+        env = CyberDefenseEnv(seed=seed)
         total_reward = 0.0
         total_actions = 0
-        save_count = 0
-        use_count = 0
-        total_battery = 0.0
-        battery_readings = 0
+        action_counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}  # IGNORE, MONITOR, RATE_LIMIT, BLOCK_IP, ISOLATE_SERVICE
+        system_health_sum = 0.0
+        health_readings = 0
         survived_episodes = 0
         
         for _ in range(episodes):
@@ -178,29 +184,21 @@ class PolicyConsumer:
             episode_reward = 0.0
             done = False
             episode_actions = 0
-            episode_save = 0
-            episode_use = 0
-            episode_battery = 0.0
-            episode_battery_count = 0
             
             while not done:
-                # Track battery
-                battery = state["battery_level"]
-                episode_battery += battery
-                episode_battery_count += 1
+                # Track system health
+                system_health_sum += state["system_health"]
+                health_readings += 1
                 
                 # Discretize state (same as training)
                 discrete_state = discretize_state(state)
                 
                 # Look up action in policy (greedy)
-                action = policy.get(str(discrete_state), 0)  # Default to SAVE if unseen
+                action = policy.get(str(discrete_state), 1)  # Default to MONITOR if unseen
                 
                 # Count actions
                 episode_actions += 1
-                if action == 0:  # SAVE
-                    episode_save += 1
-                elif action == 1:  # USE
-                    episode_use += 1
+                action_counts[action] += 1
                 
                 # Execute action
                 state, reward, done = env.step(action)
@@ -209,27 +207,22 @@ class PolicyConsumer:
             # Episode stats
             total_reward += episode_reward
             total_actions += episode_actions
-            save_count += episode_save
-            use_count += episode_use
-            total_battery += episode_battery
-            battery_readings += episode_battery_count
             
-            # Survival: if done by reaching time_slots (not battery exhaustion)
-            if done and state["battery_level"] > 0:  # Assuming done and battery >0 means survived
+            # Survival: if system didn't reach CRITICAL state
+            if state["system_health"] != 2:  # Not CRITICAL
                 survived_episodes += 1
         
         # Compute averages
         avg_reward = total_reward / episodes
-        save_percentage = save_count / total_actions if total_actions > 0 else 0
-        use_percentage = use_count / total_actions if total_actions > 0 else 0
-        avg_battery = total_battery / battery_readings if battery_readings > 0 else 0
+        action_percentages = {k: v / total_actions if total_actions > 0 else 0 for k, v in action_counts.items()}
+        avg_system_health = system_health_sum / health_readings if health_readings > 0 else 0
         survival_rate = survived_episodes / episodes
         
         return ExecutionStats(
             avg_reward=avg_reward,
-            save_percentage=save_percentage,
-            use_percentage=use_percentage,
-            avg_battery=avg_battery,
+            save_percentage=action_percentages[0],  # IGNORE percentage
+            use_percentage=action_percentages[3],   # BLOCK_IP percentage
+            avg_battery=avg_system_health,  # Renamed but holds system health average
             survival_rate=survival_rate
         )
     
@@ -256,13 +249,12 @@ class PolicyConsumer:
         Raises:
             ValueError: If baseline type is not recognized
         """
-        env = EnergySlotEnv(seed=seed)
+        env = CyberDefenseEnv(seed=seed)
         total_reward = 0.0
         total_actions = 0
-        save_count = 0
-        use_count = 0
-        total_battery = 0.0
-        battery_readings = 0
+        action_counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+        system_health_sum = 0.0
+        health_readings = 0
         survived_episodes = 0
         
         for _ in range(episodes):
@@ -270,56 +262,48 @@ class PolicyConsumer:
             episode_reward = 0.0
             done = False
             episode_actions = 0
-            episode_save = 0
-            episode_use = 0
-            episode_battery = 0.0
-            episode_battery_count = 0
             
             while not done:
-                battery = state["battery_level"]
-                episode_battery += battery
-                episode_battery_count += 1
+                system_health_sum += state["system_health"]
+                health_readings += 1
                 
                 # Select action based on baseline strategy
                 if baseline == BaselinePolicy.RANDOM:
-                    action = random.choice([0, 1])  # Random
-                elif baseline == BaselinePolicy.ALWAYS_SAVE:
-                    action = 0  # Always SAVE
-                elif baseline == BaselinePolicy.ALWAYS_USE:
-                    action = 1  # Always USE
+                    action = random.choice([0, 1, 2, 3, 4])  # Random cyber defense action
+                elif baseline == BaselinePolicy.IGNORE_ALL:
+                    action = 0  # Always IGNORE
+                elif baseline == BaselinePolicy.BLOCK_ALL:
+                    action = 3  # Always BLOCK_IP
+                elif baseline == BaselinePolicy.MONITOR_ONLY:
+                    action = 1  # Always MONITOR
                 else:
                     raise ValueError(f"Unknown baseline: {baseline}")
                 
                 episode_actions += 1
-                if action == 0:
-                    episode_save += 1
-                elif action == 1:
-                    episode_use += 1
+                action_counts[action] += 1
                 
+                # Execute action
                 state, reward, done = env.step(action)
                 episode_reward += reward
             
+            # Episode stats
             total_reward += episode_reward
             total_actions += episode_actions
-            save_count += episode_save
-            use_count += episode_use
-            total_battery += episode_battery
-            battery_readings += episode_battery_count
             
-            if done and state["battery_level"] > 0:
+            # Survival check
+            if state["system_health"] != 2:  # Not CRITICAL
                 survived_episodes += 1
         
         avg_reward = total_reward / episodes
-        save_percentage = save_count / total_actions if total_actions > 0 else 0
-        use_percentage = use_count / total_actions if total_actions > 0 else 0
-        avg_battery = total_battery / battery_readings if battery_readings > 0 else 0
+        action_percentages = {k: v / total_actions if total_actions > 0 else 0 for k, v in action_counts.items()}
+        avg_system_health = system_health_sum / health_readings if health_readings > 0 else 0
         survival_rate = survived_episodes / episodes
         
         return ExecutionStats(
             avg_reward=avg_reward,
-            save_percentage=save_percentage,
-            use_percentage=use_percentage,
-            avg_battery=avg_battery,
+            save_percentage=action_percentages[0],  # IGNORE
+            use_percentage=action_percentages[3],   # BLOCK_IP
+            avg_battery=avg_system_health,
             survival_rate=survival_rate
         )
     
@@ -344,24 +328,28 @@ class PolicyConsumer:
             
         Purpose:
             THE WOW MOMENT.
-            Show that reuse is better than ignorance.
+            Show that reuse is better than naive strategies.
             
         Demo:
-            "Reused policy: 15.0"
-            "Baseline (random): 5.0"
-            "Improvement: 200%"
+            "Reused policy: 15.0 defense score"
+            "Baseline (random): -5.0 defense score"
+            "Improvement: 400%"
         """
         policy_stats = self.execute_policy(policy, episodes, seed)
         baseline_stats = self.execute_baseline(baseline, episodes, seed)
         
         # Calculate improvement percentage
-        if baseline_stats.avg_reward > 0:
-            improvement = ((policy_stats.avg_reward - baseline_stats.avg_reward) / baseline_stats.avg_reward) * 100
-        elif baseline_stats.avg_reward < 0 and policy_stats.avg_reward > 0:
-            # Policy went from negative to positive - infinite improvement
-            improvement = float('inf')
+        # Handle both positive and negative rewards properly
+        if baseline_stats.avg_reward != 0:
+            improvement = ((policy_stats.avg_reward - baseline_stats.avg_reward) / abs(baseline_stats.avg_reward)) * 100
         else:
-            improvement = 0.0
+            # Baseline is exactly 0
+            if policy_stats.avg_reward > 0:
+                improvement = 100.0
+            elif policy_stats.avg_reward < 0:
+                improvement = -100.0
+            else:
+                improvement = 0.0
         
         return policy_stats, baseline_stats, improvement
 

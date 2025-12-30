@@ -16,24 +16,29 @@ Main Components:
 - quick_train(): Convenience training function
 
 Dependencies:
-- src.shared.env: EnergySlotEnv for training environment
+- src.environments.cyber_env: CyberDefenseEnv for simulated cyber defense
 - src.agent.trainer: Q-learning training functions
 - src.agent.policy: Policy extraction and serialization
 - src.agent.state: State discretization
 
 Author: PolicyLedger Team
 Created: 2025-12-28
+Updated: 2025-12-30 (cyber defense refactor)
+
+TODO: Google Cloud Integration
+- Vertex AI: Use custom training jobs for distributed agent training
+- Cloud Storage: Store policy artifacts in GCS buckets
+- Firestore: Track training metrics and lineage
 """
 
 from typing import NamedTuple
 import json
 from pathlib import Path
-from src.shared.env import EnergySlotEnv
+from src.environments.cyber_env import CyberDefenseEnv
+from src.environments.base_env import BaseEnv
 from src.shared.config import (
     DEFAULT_EPISODES,
-    DEFAULT_TIME_SLOTS,
-    DEFAULT_BATTERY_CAPACITY,
-    DEFAULT_ENERGY_COST
+    DEFAULT_TIME_HORIZON,
 )
 from src.agent.trainer import train
 from src.agent.policy import extract_policy, serialize_policy, hash_policy, Policy
@@ -51,13 +56,13 @@ class PolicyClaim(NamedTuple):
         env_id: Environment configuration identifier (based on seed)
         policy_hash: SHA-256 hash of policy artifact
         policy_artifact: Serialized policy
-        claimed_reward: Agent's claimed average reward
+        claimed_reward: Agent's claimed defense score (reward)
     """
     agent_id: str  # Unique identifier for this agent
     env_id: str  # Environment configuration identifier (based on seed)
     policy_hash: str  # SHA-256 hash of policy artifact
     policy_artifact: bytes  # Serialized policy
-    claimed_reward: float  # Agent's claimed average reward
+    claimed_reward: float  # Agent's claimed defense score
 
     def __repr__(self) -> str:
         return (
@@ -70,7 +75,7 @@ class PolicyClaim(NamedTuple):
         )
 
 
-def evaluate_policy(env: EnergySlotEnv, policy: Policy) -> float:
+def evaluate_policy(env: BaseEnv, policy: Policy) -> float:
     """
     Evaluate a deterministic policy by running it greedily in the environment.
 
@@ -118,9 +123,7 @@ def run_agent(
     agent_id: str,
     seed: int = 42,
     episodes: int = DEFAULT_EPISODES,
-    time_slots: int = DEFAULT_TIME_SLOTS,
-    battery_capacity: float = DEFAULT_BATTERY_CAPACITY,
-    energy_cost: float = DEFAULT_ENERGY_COST
+    time_horizon: int = DEFAULT_TIME_HORIZON,
 ) -> PolicyClaim:
     """
     Run agent training and produce policy claim.
@@ -137,9 +140,7 @@ def run_agent(
         agent_id: Unique identifier for this agent
         seed: Random seed for environment (for reproducibility)
         episodes: Number of training episodes
-        time_slots: Environment time horizon
-        battery_capacity: Battery capacity
-        energy_cost: Energy cost per USE action
+        time_horizon: Simulation time horizon (number of decision steps)
 
     Returns:
         PolicyClaim containing all artifacts and claimed performance
@@ -151,16 +152,14 @@ def run_agent(
         - Does NOT see other agents
         - Just trains and claims
     """
-    # Create environment with deterministic seed
-    env = EnergySlotEnv(
-        time_slots=time_slots,
-        battery_capacity=battery_capacity,
-        energy_cost=energy_cost,
+    # Create simulated cyber defense environment with deterministic seed
+    env = CyberDefenseEnv(
+        time_horizon=time_horizon,
         seed=seed
     )
 
     # Generate environment ID (identifies configuration)
-    env_id = f"energy_slot_env_seed_{seed}_slots_{time_slots}"
+    env_id = f"cyber_defense_env_seed_{seed}_horizon_{time_horizon}"
 
     # Train policy
     q_table, avg_training_reward = train(env, episodes)

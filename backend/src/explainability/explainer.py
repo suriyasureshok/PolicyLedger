@@ -3,6 +3,11 @@ Main Explainer — Phase 11 Implementation
 
 Chooses between Fallback and Gemini explainers.
 Same interface, different implementations.
+
+TODO: Google Cloud Integration
+- Gemini API: Use Gemini 1.5 Flash for AI-generated policy explanations
+- Cloud Functions: Generate explanations on marketplace updates
+- Caching: Cache Gemini responses in Cloud Storage for cost optimization
 """
 
 from typing import Optional
