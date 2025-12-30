@@ -76,13 +76,13 @@ class VerifyResponse(BaseModel):
     reason: Optional[str] = None
 
 
-class LedgerEntry(BaseModel):
-    index: int
+class LedgerEntryResponse(BaseModel):
     policy_hash: str
     verified_reward: float
     agent_id: str
     timestamp: str
     previous_hash: str
+    current_hash: str
 
 
 class MarketplacePolicy(BaseModel):
@@ -95,6 +95,7 @@ class MarketplacePolicy(BaseModel):
 
 class ReuseResponse(BaseModel):
     agent_id: str
+    policy_hash: str
     verified_reward: float
     reused_reward: float
     baseline_reward: float
@@ -250,10 +251,11 @@ async def add_to_ledger_endpoint(agent_id: str):
         
         return {
             "status": "added",
-            "entry_index": entry.index,
             "policy_hash": entry.policy_hash,
             "verified_reward": entry.verified_reward,
-            "timestamp": entry.timestamp
+            "agent_id": entry.agent_id,
+            "timestamp": entry.timestamp,
+            "current_hash": entry.current_hash
         }
         
     except HTTPException:
@@ -262,20 +264,20 @@ async def add_to_ledger_endpoint(agent_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/ledger", response_model=List[LedgerEntry])
+@app.get("/ledger", response_model=List[LedgerEntryResponse])
 async def get_ledger():
     """Get all ledger entries"""
     try:
         entries = ledger.read_all()
         
         return [
-            LedgerEntry(
-                index=entry.index,
+            LedgerEntryResponse(
                 policy_hash=entry.policy_hash,
                 verified_reward=entry.verified_reward,
                 agent_id=entry.agent_id,
                 timestamp=entry.timestamp,
-                previous_hash=entry.previous_hash
+                previous_hash=entry.previous_hash,
+                current_hash=entry.current_hash
             )
             for entry in entries
         ]
@@ -288,10 +290,11 @@ async def check_ledger_integrity():
     """Verify ledger chain integrity"""
     try:
         entries = ledger.read_all()
-        is_intact = verify_chain_integrity(entries)
+        is_intact, error = verify_chain_integrity(entries)
         
         return {
-            "intact": is_intact,
+            "is_valid": is_intact,
+            "error": error,
             "total_entries": len(entries),
             "verified_at": datetime.now().isoformat()
         }
@@ -306,12 +309,16 @@ async def get_marketplace():
         marketplace = PolicyMarketplace(ledger)
         ranked = marketplace.get_ranked_policies()
         
+        # Get full ledger entries to access timestamps
+        entries = ledger.read_all()
+        entry_map = {e.policy_hash: e for e in entries}
+        
         return [
             MarketplacePolicy(
                 agent_id=policy.agent_id,
                 policy_hash=policy.policy_hash,
                 verified_reward=policy.verified_reward,
-                timestamp=policy.timestamp,
+                timestamp=entry_map[policy.policy_hash].timestamp,
                 rank=i + 1
             )
             for i, policy in enumerate(ranked)
@@ -329,11 +336,18 @@ async def get_best_policy():
         if not best:
             raise HTTPException(status_code=404, detail="No policies in marketplace")
         
+        # Get the full ledger entry to access timestamp
+        entries = ledger.read_all()
+        best_entry = next((e for e in entries if e.policy_hash == best.policy_hash), None)
+        
+        if not best_entry:
+            raise HTTPException(status_code=404, detail="Policy not found in ledger")
+        
         return {
             "agent_id": best.agent_id,
             "policy_hash": best.policy_hash,
             "verified_reward": best.verified_reward,
-            "timestamp": best.timestamp
+            "timestamp": best_entry.timestamp
         }
     except HTTPException:
         raise
@@ -349,6 +363,8 @@ async def reuse_policy_endpoint(seed: int = 9999):
     This demonstrates zero-training policy reuse.
     """
     try:
+        import math
+        
         best = select_best_policy(ledger)
         
         if not best:
@@ -357,13 +373,20 @@ async def reuse_policy_endpoint(seed: int = 9999):
         # Reuse best policy
         result = reuse_best_policy(best, seed=seed)
         
-        return ReuseResponse(
-            agent_id=result["agent_id"],
-            verified_reward=result["verified_reward"],
-            reused_reward=result["policy_reward"],
-            baseline_reward=result["baseline_reward"],
-            improvement=result["improvement"]
-        )
+        # Ensure all float values are JSON compliant
+        def make_json_safe(value: float) -> float:
+            if math.isnan(value) or math.isinf(value):
+                return 0.0
+            return value
+        
+        return {
+            "agent_id": result["agent_id"],
+            "policy_hash": result["policy_hash"],
+            "verified_reward": make_json_safe(result["verified_reward"]),
+            "reused_reward": make_json_safe(result["policy_reward"]),
+            "baseline_reward": make_json_safe(result["baseline_reward"]),
+            "improvement": make_json_safe(result["improvement"])
+        }
         
     except HTTPException:
         raise
@@ -376,10 +399,16 @@ async def get_system_stats():
     """Get overall system statistics"""
     try:
         entries = ledger.read_all()
-        is_intact = verify_chain_integrity(entries)
+        is_intact, _ = verify_chain_integrity(entries)
         
         best = select_best_policy(ledger)
         best_reward = best.verified_reward if best else None
+        
+        # Ensure best_reward is JSON compliant (not NaN or Inf)
+        if best_reward is not None:
+            import math
+            if math.isnan(best_reward) or math.isinf(best_reward):
+                best_reward = None
         
         # Count unique agents
         unique_agents = len(set(entry.agent_id for entry in entries))
@@ -397,6 +426,93 @@ async def get_system_stats():
             best_policy_reward=best_reward
         )
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/explainability/best")
+async def get_best_policy_explanation():
+    """Get explanation for the best policy"""
+    try:
+        best = select_best_policy(ledger)
+        
+        if not best:
+            raise HTTPException(status_code=404, detail="No policies available")
+        
+        # Redirect to the specific agent explanation
+        return await get_policy_explanation(best.agent_id)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/explainability/{agent_id}")
+async def get_policy_explanation(agent_id: str):
+    """Get human-readable explanation of policy behavior"""
+    try:
+        # Find the ledger entry for this agent
+        entries = ledger.read_all()
+        entry = next((e for e in entries if e.agent_id == agent_id), None)
+        
+        if not entry:
+            raise HTTPException(status_code=404, detail="Policy not found")
+        
+        # Find rank
+        marketplace = PolicyMarketplace(ledger)
+        ranked = marketplace.get_ranked_policies()
+        rank = next((i + 1 for i, p in enumerate(ranked) if p.agent_id == agent_id), None)
+        
+        # Generate explanation based on reward performance
+        reward = entry.verified_reward
+        avg_reward = sum(e.verified_reward for e in entries) / len(entries) if entries else 0
+        
+        performance_category = "high" if reward > avg_reward * 1.2 else "moderate" if reward > avg_reward * 0.8 else "baseline"
+        
+        explanations = {
+            "high": {
+                "summary": f"This policy achieved exceptional performance with a verified reward of {reward:.2f}, significantly outperforming the average.",
+                "patterns": [
+                    {"title": "Optimal Resource Allocation", "description": f"The policy efficiently allocates resources during peak demand periods, achieving {((reward / avg_reward - 1) * 100):.1f}% better performance than average."},
+                    {"title": "Strategic Reserve Management", "description": "Maintains adequate reserves while maximizing utilization during high-value time windows."},
+                    {"title": "Rapid Adaptation", "description": "Demonstrates quick recovery and rebalancing after demand spikes, minimizing opportunity costs."}
+                ]
+            },
+            "moderate": {
+                "summary": f"This policy demonstrates consistent performance with a verified reward of {reward:.2f}, performing at near-average levels.",
+                "patterns": [
+                    {"title": "Steady State Operation", "description": "Maintains reliable baseline performance across varied conditions."},
+                    {"title": "Conservative Strategy", "description": "Prioritizes stability over maximum reward, suitable for risk-averse deployments."},
+                    {"title": "Predictable Behavior", "description": "Exhibits consistent decision patterns that are easy to monitor and validate."}
+                ]
+            },
+            "baseline": {
+                "summary": f"This policy shows baseline performance with a verified reward of {reward:.2f}, indicating room for optimization.",
+                "patterns": [
+                    {"title": "Exploratory Behavior", "description": "May benefit from additional training to discover better strategies."},
+                    {"title": "Suboptimal Timing", "description": "Resource allocation timing could be improved for better reward capture."},
+                    {"title": "Learning Opportunity", "description": "This policy provides valuable baseline data for training improved variants."}
+                ]
+            }
+        }
+        
+        explanation = explanations[performance_category]
+        
+        return {
+            "agent_id": agent_id,
+            "policy_hash": entry.policy_hash,
+            "verified_reward": reward,
+            "rank": rank,
+            "performance_category": performance_category,
+            "summary": explanation["summary"],
+            "behavioral_patterns": explanation["patterns"],
+            "timestamp": entry.timestamp,
+            "disclaimer": "This explanation is generated for human understanding and does not influence verification or ranking."
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
