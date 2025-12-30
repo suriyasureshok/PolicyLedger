@@ -1,8 +1,8 @@
 """
 PolicyLedger Backend API
 
-FastAPI server that provides REST endpoints for:
-- Agent training
+FastAPI server that provides REST and WebSocket endpoints for:
+- Real-time agent training with live visualization
 - Policy verification
 - Ledger management
 - Marketplace operations
@@ -11,20 +11,22 @@ FastAPI server that provides REST endpoints for:
 This bridges the PolicyLedger core with the frontend dashboard.
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional, Dict
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Set
 import json
 import time
 from datetime import datetime
 from pathlib import Path
+import asyncio
 
 from src.agent.runner import run_agent, PolicyClaim
 from src.verifier.verifier import PolicyVerifier
 from src.ledger.ledger import PolicyLedger, verify_chain_integrity
 from src.marketplace.ranking import select_best_policy, PolicyMarketplace
 from src.consumer.reuse import reuse_best_policy
+from src.training.live_trainer import training_manager
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -50,6 +52,46 @@ verifier = PolicyVerifier()
 # Training state
 training_jobs = {}
 
+# WebSocket connections for live training updates
+active_connections: Set[WebSocket] = set()
+
+
+# ============================================================================
+# WebSocket Connection Manager
+# ============================================================================
+
+class ConnectionManager:
+    """Manages WebSocket connections for real-time updates"""
+    
+    def __init__(self):
+        self.active_connections: Dict[str, Set[WebSocket]] = {}
+    
+    async def connect(self, websocket: WebSocket, agent_id: str = "global"):
+        await websocket.accept()
+        if agent_id not in self.active_connections:
+            self.active_connections[agent_id] = set()
+        self.active_connections[agent_id].add(websocket)
+    
+    def disconnect(self, websocket: WebSocket, agent_id: str = "global"):
+        if agent_id in self.active_connections:
+            self.active_connections[agent_id].discard(websocket)
+    
+    async def broadcast(self, message: dict, agent_id: str = "global"):
+        """Broadcast message to all connected clients for this agent"""
+        if agent_id in self.active_connections:
+            disconnected = set()
+            for connection in self.active_connections[agent_id]:
+                try:
+                    await connection.send_json(message)
+                except:
+                    disconnected.add(connection)
+            
+            # Clean up disconnected clients
+            for conn in disconnected:
+                self.active_connections[agent_id].discard(conn)
+
+manager = ConnectionManager()
+
 
 # ============================================================================
 # Pydantic Models
@@ -59,6 +101,24 @@ class AgentTrainRequest(BaseModel):
     agent_id: str
     seed: int = 42
     episodes: int = 150
+
+
+class LiveTrainRequest(BaseModel):
+    """Configuration for live training session"""
+    agent_id: str
+    seed: int = 42
+    max_episodes: Optional[int] = None  # None = infinite until stopped
+    epsilon_start: float = 1.0
+    epsilon_end: float = 0.01
+    epsilon_decay: float = 0.995
+    learning_rate: float = 0.1
+    discount_factor: float = 0.99
+
+
+class TrainingControlRequest(BaseModel):
+    """Control request for training session"""
+    agent_id: str
+    action: str = Field(..., pattern="^(stop|pause|resume)$")
 
 
 class AgentTrainResponse(BaseModel):
@@ -177,20 +237,281 @@ async def train_agent_endpoint(request: AgentTrainRequest, background_tasks: Bac
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================================================================
+# Live Training Endpoints (WebSocket)
+# ============================================================================
+
+@app.websocket("/ws/train/{agent_id}")
+async def websocket_train_endpoint(websocket: WebSocket, agent_id: str):
+    """
+    WebSocket endpoint for live training with real-time updates.
+    
+    The frontend connects to this endpoint and receives:
+    - Episode-by-episode training metrics
+    - Real-time reward charts data
+    - Q-table growth stats
+    - Action distribution
+    
+    Send configuration via JSON message after connecting:
+    {
+        "seed": 42,
+        "max_episodes": null,  // null = infinite
+        "epsilon_start": 1.0,
+        "epsilon_end": 0.01,
+        "epsilon_decay": 0.995
+    }
+    
+    Send control commands:
+    {"action": "stop"}
+    """
+    await manager.connect(websocket, agent_id)
+    
+    try:
+        # Wait for configuration
+        config_data = await websocket.receive_json()
+        
+        # Define callback for training updates
+        async def send_update(data):
+            try:
+                await websocket.send_json(data)
+            except:
+                pass
+        
+        # Start training in background
+        training_task = asyncio.create_task(
+            training_manager.start_training(
+                agent_id=agent_id,
+                seed=config_data.get('seed', 42),
+                max_episodes=config_data.get('max_episodes'),
+                callback=send_update,
+                config=config_data
+            )
+        )
+        
+        # Listen for control commands
+        while True:
+            try:
+                message = await websocket.receive_json()
+                
+                if message.get('action') == 'stop':
+                    training_manager.stop_training(agent_id)
+                    await websocket.send_json({
+                        "type": "control_response",
+                        "action": "stop",
+                        "status": "stopping"
+                    })
+                    break
+                    
+            except WebSocketDisconnect:
+                # Don't stop training - let it complete
+                print(f"   WebSocket disconnected for {agent_id}, but training continues...")
+                break
+                
+    except WebSocketDisconnect:
+        # Don't stop training - let it complete  
+        print(f"   WebSocket disconnected for {agent_id}, but training continues...")
+    finally:
+        manager.disconnect(websocket, agent_id)
+        
+        # Wait for training to complete before saving to ledger
+        try:
+            print(f"   Waiting for training task to complete for {agent_id}...")
+            await training_task
+            print(f"   Training task completed for {agent_id}")
+        except Exception as e:
+            print(f"   Training task error: {e}")
+        
+        # After training completes, automatically add to ledger if successful
+        try:
+            session = training_manager.get_session_state(agent_id)
+            if session and hasattr(session, 'final_policy_hash') and session.status in ["completed", "stopped"]:
+                print(f"Attempting to add policy to ledger: {session.final_policy_hash[:16]}...")
+                # Add trained policy to ledger automatically
+                entry = ledger.append(
+                    policy_hash=session.final_policy_hash,
+                    verified_reward=session.final_reward,
+                    agent_id=agent_id
+                )
+                print(f"✓ Policy {session.final_policy_hash[:16]}... automatically added to ledger")
+                print(f"  Reward: {session.final_reward:.2f} | Agent: {agent_id}")
+            else:
+                if session:
+                    print(f"Session found but not saving: status={session.status}, has_hash={hasattr(session, 'final_policy_hash')}")
+                else:
+                    print(f"No session found for agent: {agent_id}")
+        except Exception as e:
+            print(f"⚠ Warning: Could not add policy to ledger: {e}")
+            import traceback
+            traceback.print_exc()
+
+
+@app.post("/training/start")
+async def start_live_training(request: LiveTrainRequest):
+    """
+    Start a live training session (alternative to WebSocket for simpler clients).
+    
+    Training will run in the background. Use WebSocket to receive updates.
+    """
+    try:
+        # Check if already training
+        existing = training_manager.get_session_state(request.agent_id)
+        if existing and existing.status == "running":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Agent {request.agent_id} is already training"
+            )
+        
+        # Start training (no callback, updates go to WebSocket)
+        asyncio.create_task(
+            training_manager.start_training(
+                agent_id=request.agent_id,
+                seed=request.seed,
+                max_episodes=request.max_episodes,
+                callback=lambda data: manager.broadcast(data, request.agent_id),
+                config={
+                    'epsilon_start': request.epsilon_start,
+                    'epsilon_end': request.epsilon_end,
+                    'epsilon_decay': request.epsilon_decay
+                }
+            )
+        )
+        
+        return {
+            "status": "started",
+            "agent_id": request.agent_id,
+            "message": "Training started. Connect via WebSocket for updates."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/training/control")
+async def control_training(request: TrainingControlRequest):
+    """
+    Control a running training session.
+    
+    Actions: stop, pause, resume
+    """
+    try:
+        if request.action == "stop":
+            success = training_manager.stop_training(request.agent_id)
+            if not success:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No active training session for {request.agent_id}"
+                )
+            return {"status": "stopped", "agent_id": request.agent_id}
+        
+        # Add pause/resume logic if needed
+        raise HTTPException(status_code=400, detail=f"Action {request.action} not implemented")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/training/sessions")
+async def get_training_sessions():
+    """Get all active training sessions"""
+    return {
+        "sessions": training_manager.get_all_sessions(),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/training/session/{agent_id}")
+async def get_training_session(agent_id: str):
+    """Get state of a specific training session including policy info if completed"""
+    state = training_manager.get_session_state(agent_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"No session for {agent_id}")
+    
+    response = {
+        "agent_id": agent_id,
+        "status": state.status,
+        "episode": state.episode,
+        "total_episodes": state.total_episodes,
+        "metrics_count": len(state.metrics_history),
+        "q_table_size": len(state.q_table)
+    }
+    
+    # Include policy info if training completed
+    if hasattr(state, 'final_policy_hash'):
+        response["policy_hash"] = state.final_policy_hash
+        response["verified_reward"] = state.final_reward
+        response["policy_saved"] = True
+    
+    return response
+
+
 @app.post("/agent/verify/{agent_id}", response_model=VerifyResponse)
 async def verify_agent_endpoint(agent_id: str):
     """
     Verify a trained agent's policy claim.
     
     This endpoint:
+    - Checks if policy already exists in ledger (already verified)
     - Verifies the claimed reward is accurate
     - Returns verification status and verified reward
-    - Does NOT add to ledger (separate step)
+    - Works with both old training_jobs and new training_manager
     """
     try:
-        # Get claim from training jobs
+        # First check if agent already in ledger (already verified and saved)
+        ledger_entries = ledger.read_all()
+        for entry in ledger_entries:
+            if entry.agent_id == agent_id:
+                # Already verified and in ledger
+                return VerifyResponse(
+                    agent_id=agent_id,
+                    verified_reward=entry.verified_reward,
+                    status="VALID",
+                    reason="Policy already verified and added to ledger"
+                )
+        
+        # Try new training_manager
+        session = training_manager.get_session_state(agent_id)
+        if session and hasattr(session, 'final_policy_hash'):
+            # Create a policy claim from the session
+            from src.agent.runner import PolicyClaim
+            
+            # Load the policy file
+            policy_path = Path("policies") / f"{session.final_policy_hash}.json"
+            if not policy_path.exists():
+                raise HTTPException(status_code=404, detail=f"Policy file not found for {agent_id}")
+            
+            with open(policy_path, 'r') as f:
+                policy_data = json.load(f)
+            
+            # Convert policy back to the format expected by verifier
+            policy = {eval(k): v for k, v in policy_data.items()}
+            
+            claim = PolicyClaim(
+                agent_id=agent_id,
+                policy_hash=session.final_policy_hash,
+                claimed_reward=session.final_reward,
+                policy=policy
+            )
+            
+            # Verify claim
+            result = verifier.verify(claim)
+            
+            return VerifyResponse(
+                agent_id=claim.agent_id,
+                verified_reward=result.verified_reward,
+                status=result.status.value,
+                reason=result.reason
+            )
+        
+        # Fall back to old training_jobs
         if agent_id not in training_jobs:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found. Train first.")
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Agent {agent_id} not found. Either training is still in progress, or the agent was never trained."
+            )
         
         claim = training_jobs[agent_id]["claim"]
         
@@ -215,6 +536,8 @@ async def verify_agent_endpoint(agent_id: str):
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -391,6 +714,8 @@ async def reuse_policy_endpoint(seed: int = 9999):
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

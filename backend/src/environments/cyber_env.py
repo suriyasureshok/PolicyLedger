@@ -237,60 +237,62 @@ class CyberDefenseEnv(BaseEnv):
         if action == self.IGNORE:
             if severity == self.SEVERITY_HIGH:
                 # Ignoring severe attack - very bad
-                reward -= 5.0
+                reward -= 10.0
                 self.damage_accumulated += 3.0
             elif severity == self.SEVERITY_MEDIUM:
                 # Ignoring moderate attack - bad
-                reward -= 2.0
+                reward -= 4.0
                 self.damage_accumulated += 1.0
             else:
                 # Ignoring low severity - acceptable if low confidence
                 if confidence == self.CONFIDENCE_LOW:
-                    reward += 0.5  # Saved resources
+                    reward += 2.0  # Saved resources - reward conservative behavior
                 else:
-                    reward -= 0.5  # Missed opportunity
+                    reward -= 1.0  # Missed opportunity
         
         # MONITOR action
         elif action == self.MONITOR:
             # Low cost, information gathering
-            reward -= 0.1  # Small operational cost
+            reward -= 0.2  # Small operational cost
             if severity == self.SEVERITY_LOW:
-                reward += 0.5  # Good for low severity
+                reward += 3.0  # Great for low severity - clear signal
             elif severity == self.SEVERITY_HIGH:
-                reward -= 1.0  # Insufficient for high severity
+                reward -= 3.0  # Insufficient for high severity
                 self.damage_accumulated += 1.0
+            else:
+                reward += 1.0  # Reasonable for medium severity
         
         # RATE_LIMIT action
         elif action == self.RATE_LIMIT:
-            reward -= 0.5  # Moderate operational cost
+            reward -= 1.0  # Moderate operational cost
             if attack_type == self.TYPE_DOS or attack_type == self.TYPE_BRUTE_FORCE:
                 if severity >= self.SEVERITY_MEDIUM:
-                    reward += 3.0  # Effective against these attacks
+                    reward += 8.0  # Very effective against these attacks - strong signal
                 else:
-                    reward += 1.0  # Still helpful
+                    reward += 3.0  # Still helpful
             else:
                 reward -= 0.5  # Not very effective against scans
         
         # BLOCK_IP action
         elif action == self.BLOCK_IP:
-            reward -= 1.0  # Higher operational cost (false positive risk)
+            reward -= 1.5  # Higher operational cost (false positive risk)
             if severity == self.SEVERITY_HIGH and confidence == self.CONFIDENCE_HIGH:
-                reward += 4.0  # Strong response to confirmed threat
+                reward += 10.0  # Strong response to confirmed threat - strongest signal
             elif severity >= self.SEVERITY_MEDIUM:
-                reward += 2.0  # Reasonable response
+                reward += 5.0  # Reasonable response
             else:
-                reward -= 1.0  # Overreaction penalty
+                reward -= 2.0  # Overreaction penalty
         
         # ISOLATE_SERVICE action
         elif action == self.ISOLATE_SERVICE:
-            reward -= 2.0  # High operational cost (service disruption)
+            reward -= 3.0  # High operational cost (service disruption)
             if severity == self.SEVERITY_HIGH:
                 if attack_type == self.TYPE_DOS:
-                    reward += 5.0  # Critical defense for severe DOS
+                    reward += 12.0  # Critical defense for severe DOS - maximum reward
                 else:
-                    reward += 3.0  # Appropriate for severe attacks
+                    reward += 8.0  # Appropriate for severe attacks
             else:
-                reward -= 2.0  # Severe overreaction penalty
+                reward -= 4.0  # Severe overreaction penalty
         
         return reward
     

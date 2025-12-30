@@ -161,8 +161,8 @@ def run_agent(
     # Generate environment ID (identifies configuration)
     env_id = f"cyber_defense_env_seed_{seed}_horizon_{time_horizon}"
 
-    # Train policy
-    q_table, avg_training_reward = train(env, episodes)
+    # Train policy with convergence detection
+    q_table, avg_training_reward, training_stats = train(env, episodes)
 
     # Extract deterministic policy
     policy = extract_policy(q_table)
@@ -172,6 +172,13 @@ def run_agent(
     # The average training reward includes exploration and early learning,
     # but the verifier runs the greedy policy, so we must claim that reward.
     claimed_reward = evaluate_policy(env, policy)
+
+    # Log training completion
+    if training_stats['converged']:
+        print(f"  ✓ Training converged after {training_stats['episodes_trained']} episodes")
+    else:
+        print(f"  ⚠ Training completed {training_stats['episodes_trained']} episodes without convergence")
+    print(f"  📊 Q-table size: {training_stats['q_table_size']} state-action pairs")
 
     # Serialize policy
     policy_bytes = serialize_policy(policy)

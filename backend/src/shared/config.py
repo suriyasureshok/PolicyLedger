@@ -7,12 +7,20 @@ TODO: Google Cloud Integration
 - Firestore: Store configuration versions for reproducibility
 """
 
-# Q-Learning Hyperparameters
-ALPHA = 0.1  # Learning rate (α)
+# Double Q-Learning Hyperparameters (Improved Algorithm)
+ALPHA = 0.3  # Learning rate (α) - increased for faster learning
 GAMMA = 0.95  # Discount factor (γ)
 EPSILON_START = 1.0  # Initial exploration rate (ε)
-EPSILON_END = 0.01  # Minimum exploration rate
-EPSILON_DECAY = 0.995  # Decay rate per episode
+EPSILON_END = 0.05  # Minimum exploration rate - higher to maintain exploration
+EPSILON_DECAY = 0.998  # Decay rate per episode - slower decay for better exploration
+
+# Optimistic Initialization (for better exploration)
+OPTIMISTIC_INIT = 0.0  # Initial Q-value (optimistic to encourage exploration)
+
+# Experience Replay Configuration
+REPLAY_BUFFER_SIZE = 10000  # Maximum experiences to store
+REPLAY_BATCH_SIZE = 32  # Batch size for experience replay
+REPLAY_START_SIZE = 100  # Minimum experiences before replay starts
 
 # Discretization Configuration
 # State space bucketing for Q-table in cyber defense environment

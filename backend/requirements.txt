@@ -1,0 +1,23 @@
+# PolicyLedger Backend Requirements
+# FastAPI + WebSocket + Core dependencies
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+python-multipart>=0.0.6
+
+# Core RL Dependencies
+numpy>=1.21.0
+gymnasium>=0.29.0
+
+# Development
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0
+
+# Optional: Google Cloud (uncomment if needed)
+# tensorflow>=2.10.0
+# google-cloud-firestore>=2.0.0
+# google-cloud-aiplatform>=1.0.0
+# google-generativeai>=0.3.0
