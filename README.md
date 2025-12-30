@@ -72,7 +72,7 @@ PolicyLedger introduces a **verification-first architecture**:
 
 ## 🏗️ Architecture
 
-![Architecture Documentation](Architecture.md)
+[Architecture Documentation](Architecture.md)
 
 PolicyLedger consists of 6 core components:
 
