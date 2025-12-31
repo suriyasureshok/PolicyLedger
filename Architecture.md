@@ -1,6 +1,6 @@
 # PolicyLedger Architecture
 
-**Detailed Technical Architecture & Design Documentation**
+**Technical Architecture & Design Documentation**
 
 ---
 
@@ -9,13 +9,10 @@
 1. [System Overview](#system-overview)
 2. [Core Components](#core-components)
 3. [Data Flow](#data-flow)
-4. [State Management](#state-management)
-5. [Verification Mechanism](#verification-mechanism)
-6. [Security Model](#security-model)
-7. [API Design](#api-design)
-8. [Database Schema](#database-schema)
-9. [Deployment Architecture](#deployment-architecture)
-10. [Performance Considerations](#performance-considerations)
+4. [Verification Mechanism](#verification-mechanism)
+5. [Security Model](#security-model)
+6. [API Design](#api-design)
+7. [Deployment](#deployment)
 
 ---
 
@@ -23,7 +20,7 @@
 
 ### Purpose
 
-PolicyLedger is a **decentralized governance platform** for reinforcement learning policies. It establishes trust in untrusted distributed RL systems through deterministic verification and tamper-evident storage.
+PolicyLedger establishes trust in untrusted distributed RL systems through deterministic verification and tamper-evident storage.
 
 ### Design Philosophy
 
@@ -33,7 +30,7 @@ PolicyLedger is a **decentralized governance platform** for reinforcement learni
 4. **Separation of Concerns**: Clear boundaries between components
 5. **Zero-Retraining Reuse**: Consumers deploy verified policies instantly
 
-### Architecture Paradigm
+### Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -84,11 +81,6 @@ PolicyLedger is a **decentralized governance platform** for reinforcement learni
 
 **Purpose**: Deterministic simulation environment for RL training and verification.
 
-**Characteristics**:
-- **Fully Deterministic**: Seeded RNG ensures reproducibility
-- **Decision-Level**: Discrete state and action spaces
-- **Cyber Defense Domain**: Simulates incident response decisions
-
 **State Space** (5-tuple):
 ```python
 State = (
@@ -111,26 +103,6 @@ Actions = {
 }
 ```
 
-**Reward Function**:
-```python
-def compute_reward(state, action, next_state):
-    reward = 0
-    
-    # Appropriate responses earn positive rewards
-    if high_severity and defensive_action:
-        reward += damage_prevented
-    
-    # Ignoring severe attacks incurs penalties
-    if high_severity and action == IGNORE:
-        reward -= damage_occurred
-    
-    # False positives and over-reactions penalized
-    if low_severity and aggressive_action:
-        reward -= operational_cost
-    
-    return reward
-```
-
 **Determinism Guarantees**:
 - Fixed seed controls all randomness
 - Step-based (not time-based) progression
@@ -140,12 +112,6 @@ def compute_reward(state, action, next_state):
 ### 2. Training Agent (`src/agent/`)
 
 **Purpose**: RL agent that learns policies through environmental interaction.
-
-**Key Files**:
-- `trainer.py`: Q-learning implementation
-- `policy.py`: Policy representation and serialization
-- `double_q_learning.py`: Advanced training with experience replay
-- `runner.py`: Training orchestration and claim generation
 
 **Training Algorithm** (Tabular Q-Learning):
 ```python
@@ -180,27 +146,6 @@ for episode in range(num_episodes):
     epsilon *= epsilon_decay
 ```
 
-**Optional Experimental Variant - Double Q-Learning**:
-
-*Note: This is an optional extension, not core to the verification system.*
-
-```python
-# Maintains two Q-tables to reduce overestimation bias
-Q_A: Dict[State, Dict[Action, float]]
-Q_B: Dict[State, Dict[Action, float]]
-
-# Alternating updates
-if random() < 0.5:
-    action = argmax(Q_A[state])
-    Q_A[state][action] += lr * (reward + γ * Q_B[next_state][action] - Q_A[state][action])
-else:
-    action = argmax(Q_B[state])
-    Q_B[state][action] += lr * (reward + γ * Q_A[next_state][action] - Q_B[state][action])
-
-# Merged policy for submission
-Q_final = {s: {a: (Q_A[s][a] + Q_B[s][a]) / 2 for a in actions} for s in states}
-```
-
 **Policy Representation**:
 ```python
 class Policy:
@@ -217,19 +162,6 @@ class Policy:
         """Deterministic SHA-256 hash"""
         serialized = json.dumps(self.q_table, sort_keys=True)
         return hashlib.sha256(serialized.encode()).hexdigest()
-```
-
-**Policy Claim Structure**:
-```python
-@dataclass
-class PolicyClaim:
-    agent_id: str           # Unique agent identifier
-    env_id: str             # Environment configuration ID
-    policy_hash: str        # SHA-256 of policy artifact
-    artifact: Dict          # Q-table (state → action → value)
-    claimed_reward: float   # Agent's reported performance
-    seed: int               # Training seed
-    env_config: Dict        # Environment parameters
 ```
 
 ### 3. Policy Verifier (`src/verifier/verifier.py`)
@@ -268,28 +200,20 @@ def verify_claim(claim: PolicyClaim) -> VerificationResult:
     if reward_diff <= threshold:
         return VerificationResult(
             status=VerificationStatus.VALID,
-            verified_reward=total_reward,
-            reason="Claim verified through deterministic replay"
+            verified_reward=total_reward
         )
     else:
         return VerificationResult(
             status=VerificationStatus.INVALID,
-            verified_reward=None,
             reason=f"Reward mismatch: {reward_diff:.3f}"
         )
 ```
 
-**Key Properties**:
-- **Deterministic**: Same input → same output
-- **Skeptical**: Does not trust agent claims
-- **Stateless**: Each verification is independent
-- **Binary Decision**: VALID or INVALID (no partial credit)
-
 **Why Verification Works**:
-1. Environment is fully deterministic (seeded RNG)
-2. Policy is deterministic (greedy selection)
-3. Replay is deterministic (no exploration)
-4. Therefore: Same seed + same policy = same trajectory = same reward
+- Environment is fully deterministic (seeded RNG)
+- Policy is deterministic (greedy selection)
+- Replay is deterministic (no exploration)
+- Therefore: Same seed + same policy = same trajectory = same reward
 
 ### 4. Tamper-Evident Ledger (`src/ledger/ledger.py`)
 
@@ -322,15 +246,7 @@ Entry 2:                          │
 │ agent_id: agent_002          │  │
 │ timestamp: 2025-12-30T...    │  │
 │ previous_hash: entry_1.hash  │──┘
-│ current_hash: hash(entry_2)  │◄─┐
-└──────────────────────────────┘  │
-                │                  │
-                ▼                  │
-Entry N:                          │
-┌──────────────────────────────┐  │
-│ ...                          │  │
-│ previous_hash: entry_N-1.hash│──┘
-│ current_hash: hash(entry_N)  │
+│ current_hash: hash(entry_2)  │
 └──────────────────────────────┘
 ```
 
@@ -346,63 +262,6 @@ def compute_entry_hash(
     """Deterministic hash for tamper detection"""
     data = f"{policy_hash}{verified_reward}{agent_id}{timestamp}{previous_hash}"
     return hashlib.sha256(data.encode()).hexdigest()
-```
-
-**Append Operation**:
-```python
-def append(self, verification_result: VerificationResult) -> LedgerEntry:
-    # Get previous hash (or "genesis" if first entry)
-    previous_hash = self.chain[-1].current_hash if self.chain else "genesis"
-    
-    # Compute current hash
-    current_hash = compute_entry_hash(
-        policy_hash=verification_result.policy_hash,
-        verified_reward=verification_result.verified_reward,
-        agent_id=verification_result.agent_id,
-        timestamp=datetime.now().isoformat(),
-        previous_hash=previous_hash
-    )
-    
-    # Create immutable entry
-    entry = LedgerEntry(
-        policy_hash=verification_result.policy_hash,
-        verified_reward=verification_result.verified_reward,
-        agent_id=verification_result.agent_id,
-        timestamp=datetime.now().isoformat(),
-        previous_hash=previous_hash,
-        current_hash=current_hash
-    )
-    
-    # Append to chain (cannot modify existing entries)
-    self.chain.append(entry)
-    self.persist()
-    
-    return entry
-```
-
-**Integrity Verification**:
-```python
-def verify_chain_integrity(ledger: PolicyLedger) -> bool:
-    """Detect any tampering in the chain"""
-    for i, entry in enumerate(ledger.chain):
-        # Recompute hash
-        expected_hash = compute_entry_hash(
-            entry.policy_hash,
-            entry.verified_reward,
-            entry.agent_id,
-            entry.timestamp,
-            entry.previous_hash
-        )
-        
-        # Check hash matches
-        if entry.current_hash != expected_hash:
-            return False
-        
-        # Check previous_hash links correctly
-        if i > 0 and entry.previous_hash != ledger.chain[i-1].current_hash:
-            return False
-    
-    return True
 ```
 
 **Tamper-Evidence Properties**:
@@ -442,13 +301,6 @@ def select_best_policy(ledger: PolicyLedger) -> BestPolicyReference:
     )
 ```
 
-**Marketplace Invariants**:
-- Only operates on verified policies
-- Never modifies ledger
-- Deterministic selection
-- No subjective criteria
-- Transparent ranking
-
 ### 6. Policy Consumer (`src/consumer/reuse.py`)
 
 **Purpose**: Zero-retraining deployment of verified policies.
@@ -484,7 +336,7 @@ def reuse_policy(policy_ref: BestPolicyReference, env: Env) -> float:
     return total_reward
 ```
 
-**Key Differences from Training**:
+**Key Differences**:
 ```
 +----------------+-------------+-------------+-----------+
 | Phase          | Exploration | Learning    | Q-updates |
@@ -507,160 +359,113 @@ def reuse_policy(policy_ref: BestPolicyReference, env: Env) -> float:
    │   Agent     │
    │  (Edge)     │
    └──────┬──────┘
-          │ Trains policy
-          │ Q-learning with exploration
-          │ Episodes: 1000
+          │ Trains policy with Q-learning
           ▼
    ┌─────────────┐
-   │   Policy    │ ← Q-table (state→action→value)
+   │   Policy    │ ← Q-table
    │  Artifact   │
    └──────┬──────┘
-          │ Computes hash
-          │ SHA-256(Q-table)
+          │ Computes SHA-256(Q-table)
           ▼
    ┌─────────────┐
-   │ Policy Claim│ ← {agent_id, policy_hash, reward=850}
+   │ Policy Claim│ ← {agent_id, policy_hash, reward}
    └──────┬──────┘
-          │
-          ▼ Submits to API
+          │ Submits to API
+          ▼
 
 2. VERIFICATION
-   ┌─────────────┐
-   │  API Server │
-   └──────┬──────┘
-          │ Receives claim
-          ▼
    ┌─────────────┐
    │  Verifier   │
    │ (Skeptical) │
    └──────┬──────┘
-          │ Loads policy + environment
           │ Replays greedy (no exploration)
           │ Recomputes reward: 850 ✓
           ▼
    ┌─────────────┐
-   │Verification │ ← {status: VALID, verified_reward: 850}
+   │Verification │ ← {status: VALID, verified_reward}
    │   Result    │
    └──────┬──────┘
-          │
-          ▼ Passes to ledger
+          │ Passes to ledger
+          ▼
 
 3. LEDGER RECORDING
    ┌─────────────┐
    │   Ledger    │
    └──────┬──────┘
-          │ Creates entry
-          │ previous_hash = last_entry.hash
-          │ current_hash = SHA-256(entry)
+          │ Creates hash-chained entry
           ▼
    ┌─────────────┐
-   │Ledger Entry │ ← Immutable, hash-chained
+   │Ledger Entry │ ← Immutable, linked to previous
    └──────┬──────┘
-          │ Persists to disk/Firestore
+          │ Persists to storage
           ▼
-   [ledger.json] or [Firestore]
 
 4. MARKETPLACE RANKING
    ┌─────────────┐
    │ Marketplace │
    └──────┬──────┘
-          │ Queries ledger
           │ Sorts by verified_reward DESC
           ▼
    ┌─────────────┐
-   │Best Policy  │ ← {policy_hash: abc123, reward: 920}
+   │Best Policy  │ ← {policy_hash, reward}
    │  Reference  │
    └──────┬──────┘
-          │
-          ▼ Returns to consumer
+          │ Returns to consumer
+          ▼
 
 5. POLICY REUSE
    ┌─────────────┐
    │  Consumer   │
    └──────┬──────┘
-          │ Fetches best policy
-          │ Loads artifact
+          │ Executes greedy actions
           ▼
-   ┌─────────────┐
-   │   Policy    │
-   │ Execution   │ ← Greedy actions, no learning
-   └──────┬──────┘
-          │
-          ▼ Observes real-world reward
    [Deployment Complete]
 ```
 
 ---
 
-## State Management
+## Verification Mechanism
 
-### Backend State
+### Deterministic Replay
 
-**Training Sessions** (in-memory):
+**Requirements**:
+1. Seeded environment
+2. Deterministic policy
+3. No exploration during replay
+
+**Process**:
 ```python
-training_jobs: Dict[str, TrainingState] = {
-    "agent_001": TrainingState(
-        agent_id="agent_001",
-        status="running",
-        episode=450,
-        total_episodes=1000,
-        q_table={...},
-        env=CyberDefenseEnv(...),
-        metrics_history=[...]
-    )
-}
+# Same inputs
+seed = 42
+policy = Q_table(state -> action)
+
+# Same execution
+env1 = CyberDefenseEnv(seed=42)
+env2 = CyberDefenseEnv(seed=42)
+
+# Same outputs
+reward1 = execute(policy, env1)  # 850
+reward2 = execute(policy, env2)  # 850
+
+assert reward1 == reward2  # Always true
 ```
 
-**Ledger State** (persistent):
-```json
-{
-  "chain": [
-    {
-      "policy_hash": "abc123...",
-      "verified_reward": 850.0,
-      "agent_id": "agent_001",
-      "timestamp": "2025-12-30T10:30:00",
-      "previous_hash": "genesis",
-      "current_hash": "def456..."
-    },
-    ...
-  ]
-}
+### Hash Verification
+
+**Policy Hash**:
+```python
+policy_hash = SHA256(json.dumps(Q_table, sort_keys=True))
 ```
 
-**Policy Artifacts** (file system):
-```
-backend/policies/
-├── abc123def456...policy_hash.json    # Policy 1 Q-table
-├── 789ghi012jkl...policy_hash.json    # Policy 2 Q-table
-└── ...
-```
-
-### Frontend State
-
-**React Query Cache**:
-```typescript
-// Live training metrics
-queryClient.setQueryData(['training', agentId], {
-  episode: 450,
-  reward: 85.3,
-  avg_reward: 78.2,
-  epsilon: 0.15,
-  q_table_size: 234
-})
-
-// Ledger entries
-queryClient.setQueryData(['ledger'], [
-  { policy_hash: 'abc123...', verified_reward: 850, ... },
-  ...
-])
-
-// Marketplace ranking
-queryClient.setQueryData(['marketplace', 'best'], {
-  policy_hash: 'abc123...',
-  verified_reward: 920,
-  agent_id: 'agent_002'
-})
+**Chain Hash**:
+```python
+entry_hash = SHA256(
+    policy_hash + 
+    verified_reward + 
+    agent_id + 
+    timestamp + 
+    previous_hash
+)
 ```
 
 ---
@@ -674,48 +479,26 @@ queryClient.setQueryData(['marketplace', 'best'], {
 |     UNTRUSTED ZONE        |
 |  - Agent training         |
 |  - Claimed rewards        |
-|  - Edge devices           |
 +---------------------------+
-            ↓ Claims (untrusted)
+            ↓
 +---------------------------+
 |      TRUSTED ZONE         |
 |  - Verifier (replay)      |
 |  - Ledger (immutable)     |
-|  - Marketplace (objective)|
 +---------------------------+
 ```
 
 ### Threat Model
 
-**Assumptions**:
-- ✅ Agents are untrusted (can lie about rewards)
-- ✅ Verifier operates in controlled environment
-- ✅ Ledger is tamper-evident (detects modifications)
-- ✅ Environment is deterministic (enables verification)
+**Protected Against**:
+- ✅ False reward claims (verifier replays)
+- ✅ Ledger tampering (hash chain breaks)
+- ✅ Policy substitution (hash must match)
 
-**Tamper-Evidence Guarantees**:
-1. **False Reward Claims**: Verifier replays and recomputes rewards
-2. **Ledger Tampering**: Hash chain breaks if any entry modified
-3. **Policy Substitution**: Policy hash must match claim
-4. **Replay Attacks**: Policies stored by hash (idempotent)
-
-**Attacks NOT Prevented** (out of scope for research prototype):
-1. **Model Poisoning**: Agents can submit bad policies (but verified rewards will be low)
-2. **Sybil Attacks**: Single actor submitting many policies (identity verification needed)
-3. **DDoS**: Network-layer security (standard web protection required)
-4. **Side-channel attacks**: Implementation-level threat model
-
-### Cryptographic Guarantees
-
-**Hash Functions** (SHA-256):
-- Collision resistance: ~2^128 security
-- Preimage resistance: ~2^256 security
-- Deterministic output
-
-**Hash Chain Properties**:
-- Forward integrity: Past cannot be changed
-- Tamper evidence: Modifications detectable
-- Append-only: No deletions
+**NOT Protected Against** (out of scope):
+- ❌ Sybil attacks (identity verification needed)
+- ❌ DDoS attacks (network layer protection)
+- ❌ Side-channel attacks (implementation level)
 
 ---
 
@@ -729,14 +512,9 @@ POST /train
 {
   "agent_id": "agent_001",
   "seed": 42,
-  "episodes": 1000,
-  "config": {...}
+  "episodes": 1000
 }
 → 202 Accepted
-{
-  "message": "Training started",
-  "agent_id": "agent_001"
-}
 ```
 
 **Verification**:
@@ -748,8 +526,7 @@ POST /verify
 → 200 OK
 {
   "status": "VALID",
-  "verified_reward": 850.0,
-  "reason": "Claim verified"
+  "verified_reward": 850.0
 }
 ```
 
@@ -761,10 +538,8 @@ GET /ledger
   {
     "policy_hash": "abc123...",
     "verified_reward": 850,
-    "agent_id": "agent_001",
-    "timestamp": "2025-12-30T..."
-  },
-  ...
+    "agent_id": "agent_001"
+  }
 ]
 ```
 
@@ -774,8 +549,7 @@ GET /marketplace/best
 → 200 OK
 {
   "policy_hash": "def456...",
-  "verified_reward": 920,
-  "agent_id": "agent_002"
+  "verified_reward": 920
 }
 ```
 
@@ -793,78 +567,16 @@ ws://localhost:8000/ws/train/{agent_id}
     "reward": 85.3,
     "avg_reward": 78.2,
     "epsilon": 0.15,
-    "q_table_size": 234,
-    "actions_taken": {"IGNORE": 5, "MONITOR": 12, ...}
-  }
-}
-
-{
-  "type": "complete",
-  "data": {
-    "agent_id": "agent_001",
-    "final_reward": 850.0
+    "q_table_size": 234
   }
 }
 ```
 
 ---
 
-## Database Schema
+## Deployment
 
-### Local Storage (ledger.json)
-
-```json
-{
-  "chain": [
-    {
-      "policy_hash": "string (64 chars SHA-256)",
-      "verified_reward": "float",
-      "agent_id": "string",
-      "timestamp": "ISO 8601 string",
-      "previous_hash": "string (64 chars SHA-256 or 'genesis')",
-      "current_hash": "string (64 chars SHA-256)",
-      "env_config": {
-        "time_horizon": "int",
-        "seed": "int",
-        ...
-      }
-    }
-  ]
-}
-```
-
-### Firestore Schema (Google Cloud)
-
-```
-Collection: ledger_entries
-├── Document: {policy_hash}
-│   ├── policy_hash: string
-│   ├── verified_reward: number
-│   ├── agent_id: string
-│   ├── timestamp: timestamp
-│   ├── previous_hash: string
-│   ├── current_hash: string
-│   └── env_config: map
-
-Collection: policies
-├── Document: {policy_hash}
-│   ├── artifact: map (Q-table)
-│   ├── created_at: timestamp
-│   └── metadata: map
-
-Collection: verification_jobs
-├── Document: {job_id}
-│   ├── status: string
-│   ├── claim: map
-│   ├── result: map
-│   └── created_at: timestamp
-```
-
----
-
-## Deployment Architecture
-
-### Local Development
+### Local Development (with GCP Backend)
 
 ```
 ┌─────────────────┐       ┌─────────────────┐
@@ -874,163 +586,97 @@ Collection: verification_jobs
 └─────────────────┘  WS   └─────────────────┘
                               │
                               ▼
-                         [ledger.json]
-                         [policies/*.json]
+                    ┌──────────────────┐
+                    │   Firestore      │
+                    │ (Cloud Backend)  │
+                    └──────────────────┘
 ```
 
-### Google Cloud Production
+### Production Deployment (Google Cloud)
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                   Frontend (Firebase Hosting)        │
-│                   https://app.policyledger.dev       │
+│                   Frontend (Hosting)                 │
+│                   React SPA                          │
+│            Dark Dashboard Theme                      │
+│  - Deep Navy Background (#0f0c1a)                   │
+│  - Purple Primary (#8b70ff)                         │
+│  - Hot Pink Secondary (#ff2d75)                     │
+│  - Cyan Accent (#00d4ff)                            │
+│  - Glassmorphism + Neon Effects                     │
 └───────────────────────┬──────────────────────────────┘
                         │ HTTPS
                         ▼
 ┌──────────────────────────────────────────────────────┐
 │              Backend (Cloud Run)                     │
 │         FastAPI + WebSocket Support                  │
-│  Auto-scaling: 1-10 instances                        │
 └───────────┬─────────────────┬────────────────────────┘
             │                 │
             ▼                 ▼
 ┌──────────────────┐  ┌──────────────────┐
 │    Firestore     │  │   Vertex AI      │
 │  (Ledger Store)  │  │ (Verification)   │
-│  Auto-replicated │  │ Custom Jobs      │
 └──────────────────┘  └──────────────────┘
-            │
-            ▼
-┌──────────────────────────────────────────────────────┐
-│         Cloud Functions (Event-Driven)               │
-│  - on_ledger_update: Update marketplace rankings     │
-│  - monitor_verification: Check Vertex AI job status  │
-└──────────────────────────────────────────────────────┘
 ```
+
+**Frontend Architecture**:
+- **Framework**: React 18 + TypeScript + Vite
+- **UI Library**: shadcn/ui (Radix UI primitives)
+- **Styling**: Tailwind CSS with HSL color system
+- **State**: TanStack Query for server state
+- **Charts**: Recharts for data visualization
+- **Real-time**: WebSocket for live training updates
+
+**Design System**:
+- **Color Palette**: Dark control room theme
+  - Background: HSL(250, 20%, 8%) - Almost black
+  - Primary: HSL(255, 70%, 65%) - Purple
+  - Secondary: HSL(330, 85%, 65%) - Hot pink
+  - Accent: HSL(195, 100%, 50%) - Cyan
+- **Effects**: Glassmorphism, neon glows, gradients
+- **Typography**: IBM Plex Sans + IBM Plex Mono
+- **Animations**: Smooth transitions, pulse effects
+
+**Requirements** (Mandatory):
+- GCP account with **billing enabled**
+- gcloud CLI installed and authenticated
+- Gemini API key from [makersuite.google.com](https://makersuite.google.com/app/apikey)
+- Project ID
+
+**Setup**:
+```bash
+.\setup-gcp.ps1  # Windows
+# or
+./setup-gcp.sh   # Linux/Mac
+```
+
+**Core GCP Services Used**:
+- **Firestore**: Primary ledger storage (distributed NoSQL database)
+- **Vertex AI**: Scalable verification compute
+- **Gemini API**: AI-powered explanations and insights
+- **Cloud Run**: Production API hosting with auto-scaling
+- **Secret Manager**: Secure credential storage
+- **Cloud Functions**: Event-driven workflows
 
 ---
 
 ## Performance Considerations
 
 ### Training Performance
-
 - **Q-table size**: O(|S| × |A|) memory
-- **Episode duration**: O(T) steps (T = time horizon)
+- **Episode duration**: O(T) steps
 - **Total training**: O(E × T) where E = episodes
 
-**Optimization**:
-- Use NumPy for vectorized operations
-- Sparse Q-table representation
-- Early stopping when converged
-
 ### Verification Performance
-
 - **Replay time**: O(T) steps (same as training episode)
-- **Determinism overhead**: Minimal (seeded RNG)
 - **Parallelization**: Verify multiple policies concurrently
 
-**Bottleneck**: Verification is sequential per policy.
-
-**Scalability** (Google Cloud):
-- Vertex AI Custom Jobs for parallel verification
-- Cloud Functions for event-driven ledger updates
-- Firestore automatic scaling
-
 ### Ledger Performance
-
 - **Append**: O(1) time
 - **Query all**: O(N) where N = chain length
 - **Integrity check**: O(N) time
 
-**Optimization**:
-- Cache best policy reference
-- Index by verified_reward in Firestore
-- Batch writes
-
-### API Performance
-
-- **Throughput**: ~100 req/s (local), ~1000 req/s (Cloud Run)
-- **Latency**: 
-  - Training submit: <50ms
-  - Verification: ~1-10s (depends on episode length)
-  - Ledger query: <100ms
-  - Marketplace query: <50ms
-
-**WebSocket Performance**:
-- Update frequency: 10-50 updates/sec
-- Concurrent connections: Limited by memory
-
 ---
 
-## Testing Strategy
-
-### Unit Tests
-
-```python
-# Test deterministic environment
-def test_env_determinism():
-    env1 = CyberDefenseEnv(seed=42)
-    env2 = CyberDefenseEnv(seed=42)
-    
-    for _ in range(100):
-        action = random_action()
-        s1, r1, d1 = env1.step(action)
-        s2, r2, d2 = env2.step(action)
-        
-        assert s1 == s2
-        assert r1 == r2
-        assert d1 == d2
-```
-
-```python
-# Test hash chain integrity
-def test_ledger_tamper_detection():
-    ledger = PolicyLedger()
-    ledger.append(entry1)
-    ledger.append(entry2)
-    
-    # Tamper with entry
-    ledger.chain[0].verified_reward = 9999
-    
-    assert not verify_chain_integrity(ledger)
-```
-
-### Integration Tests
-
-```python
-# End-to-end workflow
-def test_complete_workflow():
-    # Train
-    claim = train_agent(seed=42, episodes=100)
-    
-    # Verify
-    result = verifier.verify(claim)
-    assert result.status == VerificationStatus.VALID
-    
-    # Record
-    entry = ledger.append(result)
-    
-    # Select
-    best = marketplace.select_best_policy(ledger)
-    assert best.policy_hash == claim.policy_hash
-    
-    # Reuse
-    reward = consumer.reuse_policy(best, env)
-    assert abs(reward - result.verified_reward) < threshold
-```
-
----
-
-## 🔮 Future Enhancements
-
-1. **Byzantine Fault Tolerance**: Multiple verifiers with consensus
-2. **Privacy-Preserving Verification**: Zero-knowledge proofs
-3. **Distributed Verifier Network**: Decentralized verification
-4. **Policy Compression**: Reduce storage for large policies
-5. **Multi-Environment Support**: Standardized interface
-6. **Adversarial Testing**: Red-team attacks on verification
-
----
-
-**Document Version**: 1.0  
-**Last Updated**: December 30, 2025
+**Document Version**: 2.0  
+**Last Updated**: December 31, 2025

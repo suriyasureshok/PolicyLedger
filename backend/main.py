@@ -378,28 +378,55 @@ async def websocket_train_endpoint(websocket: WebSocket, agent_id: str):
         except Exception as e:
             print(f"   Training task error: {e}")
         
-        # After training completes, automatically add to ledger if successful
+        # After training completes, VERIFY then add to ledger if valid
         try:
             session = training_manager.get_session_state(agent_id)
             if session and hasattr(session, 'final_policy_hash') and session.status in ["completed", "stopped"]:
-                print(f"Attempting to add policy to ledger: {session.final_policy_hash[:16]}...")
-                # Add trained policy to ledger automatically with environment config
-                entry = ledger.append(
-                    policy_hash=session.final_policy_hash,
-                    verified_reward=session.final_reward,
-                    agent_id=agent_id,
-                    env_config=session.env_config
-                )
-                print(f"✓ Policy {session.final_policy_hash[:16]}... automatically added to ledger")
-                print(f"  Reward: {session.final_reward:.2f} | Agent: {agent_id}")
-                print(f"  Environment: {session.env_config.get('display_name', 'Unknown')}")
+                print(f"Training completed for {agent_id}. Running verification...")
+                
+                # Load policy for verification
+                policy_path = Path("policies") / f"{session.final_policy_hash}.json"
+                if not policy_path.exists():
+                    print(f"⚠ Policy file not found: {policy_path}")
+                else:
+                    # Load and parse policy
+                    policy = load_policy_from_file(policy_path)
+                    
+                    # Create policy claim
+                    from src.agent.runner import PolicyClaim
+                    claim = PolicyClaim(
+                        agent_id=agent_id,
+                        policy_hash=session.final_policy_hash,
+                        claimed_reward=session.final_reward,
+                        policy=policy
+                    )
+                    
+                    # VERIFY the policy claim
+                    verification_result = verifier.verify(claim)
+                    
+                    if verification_result.status == VerificationStatus.VALID:
+                        # Only add VALID policies to ledger
+                        entry = ledger.append(
+                            policy_hash=session.final_policy_hash,
+                            verified_reward=verification_result.verified_reward,
+                            agent_id=agent_id,
+                            env_config=session.env_config
+                        )
+                        print(f"✓ Policy VERIFIED and added to ledger")
+                        print(f"  Claimed: {session.final_reward:.3f} | Verified: {verification_result.verified_reward:.3f}")
+                        print(f"  Agent: {agent_id} | Environment: {session.env_config.get('display_name', 'Unknown')}")
+                    else:
+                        # INVALID policy - do NOT add to ledger
+                        print(f"✗ Policy INVALID - NOT added to ledger")
+                        print(f"  Reason: {verification_result.reason}")
+                        print(f"  Claimed: {session.final_reward:.3f} | Verified: {verification_result.verified_reward:.3f}")
             else:
                 if session:
-                    print(f"Session found but not saving: status={session.status}, has_hash={hasattr(session, 'final_policy_hash')}")
+                    print(f"Session found but not processing: status={session.status}, has_hash={hasattr(session, 'final_policy_hash')}")
                 else:
                     print(f"No session found for agent: {agent_id}")
         except Exception as e:
-            print(f"⚠ Warning: Could not add policy to ledger: {e}")
+            print(f"⚠ Warning: Verification/ledger error: {e}")
             import traceback
             traceback.print_exc()
 

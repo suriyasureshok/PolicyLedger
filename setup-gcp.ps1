@@ -2,7 +2,7 @@
 # Run this on Windows to setup Google Cloud integration
 
 Write-Host "PolicyLedger Google Cloud Setup" -ForegroundColor Blue
-Write-Host "========================================" 
+Write-Host "========================================"
 Write-Host ""
 
 # Check if gcloud is installed
@@ -24,52 +24,38 @@ if ([string]::IsNullOrWhiteSpace($PROJECT_ID)) {
 }
 
 gcloud config set project $PROJECT_ID
-Write-Host "✓ Project set to: $PROJECT_ID" -ForegroundColor Green
+Write-Host "[OK] Project set to: $PROJECT_ID" -ForegroundColor Green
 Write-Host ""
 
 # Enable APIs
 Write-Host "Step 2: Enabling Required APIs" -ForegroundColor Blue
 Write-Host "This may take a few minutes..."
 
-gcloud services enable `
-    cloudbuild.googleapis.com `
-    run.googleapis.com `
-    firestore.googleapis.com `
-    aiplatform.googleapis.com `
-    cloudfunctions.googleapis.com `
-    artifactregistry.googleapis.com `
-    logging.googleapis.com `
-    monitoring.googleapis.com `
-    secretmanager.googleapis.com
+gcloud services enable cloudbuild.googleapis.com run.googleapis.com firestore.googleapis.com aiplatform.googleapis.com cloudfunctions.googleapis.com artifactregistry.googleapis.com logging.googleapis.com monitoring.googleapis.com secretmanager.googleapis.com
 
-Write-Host "✓ APIs enabled" -ForegroundColor Green
+Write-Host "[OK] APIs enabled" -ForegroundColor Green
 Write-Host ""
 
 # Create Artifact Registry repository
 Write-Host "Step 3: Creating Artifact Registry Repository" -ForegroundColor Blue
-gcloud artifacts repositories create policyledger-repo `
-    --repository-format=docker `
-    --location=us-central1 `
-    --description="PolicyLedger container images" 2>$null
+gcloud artifacts repositories create policyledger-repo --repository-format=docker --location=us-central1 --description="PolicyLedger container images" 2>$null
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Repository already exists" -ForegroundColor Yellow
 }
 
-Write-Host "✓ Artifact Registry ready" -ForegroundColor Green
+Write-Host "[OK] Artifact Registry ready" -ForegroundColor Green
 Write-Host ""
 
 # Initialize Firestore
 Write-Host "Step 4: Initializing Firestore" -ForegroundColor Blue
-gcloud firestore databases create `
-    --location=us-central1 `
-    --type=firestore-native 2>$null
+gcloud firestore databases create --location=us-central1 --type=firestore-native 2>$null
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Firestore already initialized" -ForegroundColor Yellow
 }
 
-Write-Host "✓ Firestore ready" -ForegroundColor Green
+Write-Host "[OK] Firestore ready" -ForegroundColor Green
 Write-Host ""
 
 # Setup Gemini API Key
@@ -78,47 +64,38 @@ Write-Host "Get your Gemini API key from: https://makersuite.google.com/app/apik
 $GEMINI_KEY = Read-Host "Enter your Gemini API key (or press Enter to skip)"
 
 if (![string]::IsNullOrWhiteSpace($GEMINI_KEY)) {
-    $GEMINI_KEY | gcloud secrets create gemini-api-key `
-        --data-file=- `
-        --replication-policy="automatic" 2>$null
+    echo $GEMINI_KEY | gcloud secrets create gemini-api-key --data-file=- --replication-policy="automatic" 2>$null
     
     if ($LASTEXITCODE -ne 0) {
-        $GEMINI_KEY | gcloud secrets versions add gemini-api-key --data-file=-
+        echo $GEMINI_KEY | gcloud secrets versions add gemini-api-key --data-file=-
     }
     
-    Write-Host "✓ Gemini API key stored in Secret Manager" -ForegroundColor Green
+    Write-Host "[OK] Gemini API key stored in Secret Manager" -ForegroundColor Green
 } else {
-    Write-Host "⚠ Skipped Gemini API key setup" -ForegroundColor Yellow
+    Write-Host "[WARNING] Skipped Gemini API key setup" -ForegroundColor Yellow
 }
 Write-Host ""
 
 # Create service accounts
 Write-Host "Step 6: Creating Service Accounts" -ForegroundColor Blue
 
-gcloud iam service-accounts create policyledger-api `
-    --display-name="PolicyLedger API" 2>$null
+gcloud iam service-accounts create policyledger-api --display-name="PolicyLedger API" 2>$null
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "API service account already exists" -ForegroundColor Yellow
 }
 
 # Grant permissions
-gcloud projects add-iam-policy-binding $PROJECT_ID `
-    --member="serviceAccount:policyledger-api@$PROJECT_ID.iam.gserviceaccount.com" `
-    --role="roles/datastore.user" `
-    --condition=None
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:policyledger-api@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/datastore.user"
 
-gcloud projects add-iam-policy-binding $PROJECT_ID `
-    --member="serviceAccount:policyledger-api@$PROJECT_ID.iam.gserviceaccount.com" `
-    --role="roles/secretmanager.secretAccessor" `
-    --condition=None
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:policyledger-api@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"
 
-Write-Host "✓ Service accounts configured" -ForegroundColor Green
+Write-Host "[OK] Service accounts configured" -ForegroundColor Green
 Write-Host ""
 
 # Create environment file
 Write-Host "Step 7: Creating Local Environment File" -ForegroundColor Blue
-@"
+$envContent = @"
 # Google Cloud Configuration
 GOOGLE_CLOUD_PROJECT=$PROJECT_ID
 VERTEX_AI_LOCATION=us-central1
@@ -132,14 +109,16 @@ GOOGLE_API_KEY=$GEMINI_KEY
 # Application Settings
 ENVIRONMENT=development
 LOG_LEVEL=INFO
-"@ | Out-File -FilePath "backend\.env.local" -Encoding UTF8
+"@
 
-Write-Host "✓ Created backend\.env.local" -ForegroundColor Green
+$envContent | Out-File -FilePath "backend\.env.local" -Encoding UTF8
+
+Write-Host "[OK] Created backend\.env.local" -ForegroundColor Green
 Write-Host ""
 
 # Setup complete
 Write-Host "========================================" -ForegroundColor Green
-Write-Host "✓ Google Cloud Setup Complete!" -ForegroundColor Green
+Write-Host "[OK] Google Cloud Setup Complete!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:"
