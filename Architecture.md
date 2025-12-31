@@ -4,7 +4,7 @@
 
 ---
 
-## 📐 Table of Contents
+## Table of Contents
 
 1. [System Overview](#system-overview)
 2. [Core Components](#core-components)
@@ -19,7 +19,7 @@
 
 ---
 
-## 🎯 System Overview
+## System Overview
 
 ### Purpose
 
@@ -78,7 +78,7 @@ PolicyLedger is a **decentralized governance platform** for reinforcement learni
 
 ---
 
-## 🔧 Core Components
+## Core Components
 
 ### 1. Environment (`src/environments/cyber_env.py`)
 
@@ -180,7 +180,10 @@ for episode in range(num_episodes):
     epsilon *= epsilon_decay
 ```
 
-**Double Q-Learning Variant**:
+**Optional Experimental Variant - Double Q-Learning**:
+
+*Note: This is an optional extension, not core to the verification system.*
+
 ```python
 # Maintains two Q-tables to reduce overestimation bias
 Q_A: Dict[State, Dict[Action, float]]
@@ -494,7 +497,7 @@ def reuse_policy(policy_ref: BestPolicyReference, env: Env) -> float:
 
 ---
 
-## 🔄 Data Flow
+## Data Flow
 
 ### Complete Workflow
 
@@ -589,7 +592,7 @@ def reuse_policy(policy_ref: BestPolicyReference, env: Env) -> float:
 
 ---
 
-## 💾 State Management
+## State Management
 
 ### Backend State
 
@@ -662,7 +665,7 @@ queryClient.setQueryData(['marketplace', 'best'], {
 
 ---
 
-## 🔐 Security Model
+## Security Model
 
 ### Trust Boundaries
 
@@ -686,20 +689,21 @@ queryClient.setQueryData(['marketplace', 'best'], {
 
 **Assumptions**:
 - ✅ Agents are untrusted (can lie about rewards)
-- ✅ Verifier is trusted (operates in secure environment)
+- ✅ Verifier operates in controlled environment
 - ✅ Ledger is tamper-evident (detects modifications)
 - ✅ Environment is deterministic (enables verification)
 
-**Attacks Prevented**:
+**Tamper-Evidence Guarantees**:
 1. **False Reward Claims**: Verifier replays and recomputes rewards
 2. **Ledger Tampering**: Hash chain breaks if any entry modified
 3. **Policy Substitution**: Policy hash must match claim
 4. **Replay Attacks**: Policies stored by hash (idempotent)
 
-**Attacks NOT Prevented** (out of scope):
+**Attacks NOT Prevented** (out of scope for research prototype):
 1. **Model Poisoning**: Agents can submit bad policies (but verified rewards will be low)
-2. **Sybil Attacks**: Single actor submitting many policies (rate limiting needed)
-3. **DDoS**: Standard web security required
+2. **Sybil Attacks**: Single actor submitting many policies (identity verification needed)
+3. **DDoS**: Network-layer security (standard web protection required)
+4. **Side-channel attacks**: Implementation-level threat model
 
 ### Cryptographic Guarantees
 
@@ -715,7 +719,7 @@ queryClient.setQueryData(['marketplace', 'best'], {
 
 ---
 
-## 🌐 API Design
+## API Design
 
 ### REST Endpoints
 
@@ -805,7 +809,7 @@ ws://localhost:8000/ws/train/{agent_id}
 
 ---
 
-## 📊 Database Schema
+## Database Schema
 
 ### Local Storage (ledger.json)
 
@@ -858,7 +862,7 @@ Collection: verification_jobs
 
 ---
 
-## 🚀 Deployment Architecture
+## Deployment Architecture
 
 ### Local Development
 
@@ -906,7 +910,7 @@ Collection: verification_jobs
 
 ---
 
-## ⚡ Performance Considerations
+## Performance Considerations
 
 ### Training Performance
 
@@ -958,7 +962,7 @@ Collection: verification_jobs
 
 ---
 
-## 🧪 Testing Strategy
+## Testing Strategy
 
 ### Unit Tests
 

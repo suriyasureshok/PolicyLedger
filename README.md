@@ -1,6 +1,6 @@
 # PolicyLedger
 
-**Decentralized RL Policy Governance Platform with Tamper-Evident Verification**
+**Architecture-Complete Research Prototype for Decentralized RL Policy Governance**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -41,11 +41,11 @@ PolicyLedger introduces a **verification-first architecture**:
 
 - 🔐 **Tamper-Evident Ledger**: Hash-chained immutable storage for verified policies
 - ✅ **Deterministic Verification**: Replay policies to confirm performance claims
-- 📊 **Real-Time Training Visualization**: WebSocket-based live training dashboard
+- 📊 **Live Policy Generation Visualization**: WebSocket-based dashboard (for decentralization demonstration)
 - 🏆 **Policy Marketplace**: Objective ranking based on verified rewards
 - 🔄 **Policy Reuse**: Deploy verified policies without retraining
 - 🧠 **AI-Powered Explanations**: Gemini API integration for policy insights
-- 📈 **Advanced Training Algorithms**: Double Q-Learning with experience replay
+- 📈 **Training Algorithms**: Tabular Q-Learning (Double Q-Learning variant available as optional experimental extension)
 
 ### Technology Stack
 
@@ -84,9 +84,8 @@ PolicyLedger consists of 6 core components:
 
 ### 2. **Training Agent** (`src/agent/`)
 - Tabular Q-Learning with epsilon-greedy exploration
-- Double Q-Learning variant for reduced overestimation
-- Experience replay buffer for improved sample efficiency
 - Produces serializable Q-table policies
+- *(Optional experimental variant: Double Q-Learning - not core to verification system)*
 
 ### 3. **Policy Verifier** (`src/verifier/`)
 - Deterministic policy replay engine
@@ -168,18 +167,20 @@ cd frontend\policy-ledger-insights
 
 ## 📖 Usage Examples
 
-### 1. Live Training Dashboard
+### 1. Live Policy Generation Dashboard
 
 Access the web UI at `http://localhost:5173` and:
 
 1. Navigate to **"Live Training"** page
-2. Configure training parameters (episodes, seed, environment)
+2. Configure generation parameters (episodes, seed, environment)
 3. Click **"Start Training"**
-4. Watch real-time metrics:
+4. Observe policy generation metrics:
    - Episode rewards
    - Q-table growth
    - Action distribution
    - Epsilon decay
+
+*Note: This demonstrates decentralized policy generation, not RL algorithm quality.*
 
 ### 2. Command Line Demo
 
@@ -323,15 +324,15 @@ python -c "from src.ledger.ledger import verify_chain_integrity, PolicyLedger; v
 PolicyLedger/
 ├── backend/
 │   ├── src/
-│   │   ├── agent/          # RL training & policy management
-│   │   ├── verifier/       # Deterministic verification
-│   │   ├── ledger/         # Tamper-evident storage
-│   │   ├── marketplace/    # Policy ranking
-│   │   ├── consumer/       # Policy reuse
-│   │   ├── environments/   # Cyber defense simulation
-│   │   ├── training/       # Live training system
-│   │   ├── execution/      # Live execution features
-│   │   └── explainability/ # AI-powered insights
+│   │   ├── agent/          # Core: RL policy generation
+│   │   ├── verifier/       # Core: Deterministic verification
+│   │   ├── ledger/         # Core: Tamper-evident storage
+│   │   ├── marketplace/    # Core: Policy ranking
+│   │   ├── consumer/       # Core: Policy reuse
+│   │   ├── environments/   # Core: Cyber defense simulation
+│   │   ├── training/       # Support: Live generation system
+│   │   ├── execution/      # Support: Execution monitoring
+│   │   └── explainability/ # Support: AI-powered insights
 │   ├── main.py             # FastAPI application
 │   ├── requirements.txt    # Python dependencies
 │   └── pyproject.toml      # Project configuration
@@ -348,11 +349,13 @@ PolicyLedger/
 └── checklist.md           # Google Cloud deployment checklist
 ```
 
+**Note**: `training/`, `execution/`, and `explainability/` are support modules for demonstration and visualization. The 6 core architectural components are: `agent/`, `verifier/`, `ledger/`, `marketplace/`, `consumer/`, and `environments/`.
+
 ---
 
-## 🌩️ Google Cloud Integration (Optional)
+## 🌩️ Google Cloud Integration (Optional Extension)
 
-PolicyLedger is designed for Google Cloud Platform deployment:
+PolicyLedger includes optional cloud integration paths for scalability research:
 
 - **Firestore**: Distributed ledger with automatic replication
 - **Vertex AI**: Scalable policy verification workloads
@@ -360,6 +363,8 @@ PolicyLedger is designed for Google Cloud Platform deployment:
 - **Gemini API**: AI-powered policy explanations
 - **Cloud Run**: Serverless API deployment
 - **Cloud Build**: CI/CD automation
+
+*Note: These are architectural extensions, not required for core system operation.*
 
 See [checklist.md](checklist.md) for deployment guide.
 
@@ -395,14 +400,26 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 ## 🎓 Research Context
 
-PolicyLedger demonstrates key concepts in:
-- Decentralized reinforcement learning
-- Blockchain-inspired tamper evidence
-- Deterministic verification systems
-- RL policy marketplaces
-- Trustless distributed systems
+PolicyLedger is an **architecture-complete research prototype** demonstrating:
+- Decentralized reinforcement learning governance
+- Blockchain-inspired tamper-evident verification
+- Deterministic replay-based trust mechanisms
+- RL policy marketplace dynamics
+- Zero-retraining policy transfer
 
-**Not a production security system** - this is a research prototype for demonstrating verification concepts in distributed RL.
+### Security Scope
+
+**What PolicyLedger provides:**
+- ✅ Tamper-evident ledger (detects modifications)
+- ✅ Deterministic verification (replay-based trust)
+- ✅ Immutable policy records (hash-chained storage)
+
+**What PolicyLedger does NOT prevent:**
+- ❌ Sybil attacks (identity verification out of scope)
+- ❌ DDoS attacks (network layer security separate concern)
+- ❌ Side-channel attacks (implementation-level threat model)
+
+**Classification**: System-complete research prototype with local and optional cloud deployment paths.
 
 ---
 

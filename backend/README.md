@@ -1,14 +1,15 @@
 # PolicyLedger Backend
 
-FastAPI backend for the PolicyLedger multi-agent training system with Double Q-Learning.
+FastAPI backend for PolicyLedger's tamper-evident RL policy verification system.
 
 ## Features
 
-- Double Q-Learning with Experience Replay
-- Real-time WebSocket updates
-- Multi-agent concurrent training
-- Policy ledger management
-- Cyber defense environment
+- Tabular Q-Learning (with optional Double Q-Learning experimental variant)
+- Live policy generation via WebSocket
+- Multi-agent concurrent training support
+- Deterministic policy verification
+- Tamper-evident ledger management
+- Cyber defense environment simulation
 
 ## Running
 

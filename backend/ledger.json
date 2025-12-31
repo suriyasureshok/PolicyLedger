@@ -1,6 +1,6 @@
 {
   "ledger_version": "1.0",
-  "total_entries": 20,
+  "total_entries": 31,
   "entries": [
     {
       "policy_hash": "5e232841b182f0c834fc6ab4e7d57c56e4e11058c3761a6384c61b9a2758ce2d",
@@ -161,6 +161,94 @@
       "timestamp": "2025-12-30T20:38:29.619641",
       "previous_hash": "207441ce8c317623c8351d8cc41ca60419b71d76ad41a423a16f573e23470e97",
       "current_hash": "314b8d308015a43d09bd9dff03f7067ca023be558308c47f69c178cd0e720b29"
+    },
+    {
+      "policy_hash": "3a7478128cbae4895e721977162963666def8c96c4488e6696d30b890912c64d",
+      "verified_reward": 80.458,
+      "agent_id": "agent_live_1767122231152",
+      "timestamp": "2025-12-31T00:47:33.582327",
+      "previous_hash": "314b8d308015a43d09bd9dff03f7067ca023be558308c47f69c178cd0e720b29",
+      "current_hash": "18ff7ceeb718e9a86a20b24eac78b0ea842213c906cab5f206c22a14861a24c6"
+    },
+    {
+      "policy_hash": "5f692635c32b6dc7731e4f77ad4d6cda9e5e2013e84e6765ac0531ea4dc84341",
+      "verified_reward": 84.31700000000001,
+      "agent_id": "agent_live_1767122333807",
+      "timestamp": "2025-12-31T00:51:03.881751",
+      "previous_hash": "18ff7ceeb718e9a86a20b24eac78b0ea842213c906cab5f206c22a14861a24c6",
+      "current_hash": "ae5b88dd40d737d81d901191c0fb4a2b8ba7b7af614bd50d8efc4c124d519ae0"
+    },
+    {
+      "policy_hash": "1975b75a00265c148b1cd70a1b4f9bef5fa880577fc0d3f062063f0312725b3a",
+      "verified_reward": 80.48599999999999,
+      "agent_id": "agent_live_1767122333807",
+      "timestamp": "2025-12-31T00:54:03.784269",
+      "previous_hash": "ae5b88dd40d737d81d901191c0fb4a2b8ba7b7af614bd50d8efc4c124d519ae0",
+      "current_hash": "5089642258352662a41e7d4db3172d679b88b6e258bfc1d9d9001b4fac360729"
+    },
+    {
+      "policy_hash": "bea56d075952fcebd4320f308e0738396bee6b1831f8e1ab5a8514d5202e2d67",
+      "verified_reward": 74.347,
+      "agent_id": "agent_live_1767122787142",
+      "timestamp": "2025-12-31T00:57:21.040303",
+      "previous_hash": "5089642258352662a41e7d4db3172d679b88b6e258bfc1d9d9001b4fac360729",
+      "current_hash": "3c2de3982b0f8dc146ad6c89bf4ee4d295e66c1f4327bda6aef05c0ac81cbebe"
+    },
+    {
+      "policy_hash": "34f09ded7ce221af1b82efa7b3b1e4493ce019e63ea1f11d266fda5cf56dd712",
+      "verified_reward": 87.95,
+      "agent_id": "agent_live_1767122976761",
+      "timestamp": "2025-12-31T01:00:44.227717",
+      "previous_hash": "3c2de3982b0f8dc146ad6c89bf4ee4d295e66c1f4327bda6aef05c0ac81cbebe",
+      "current_hash": "cfa06520fd3be018dc9f5eab1b16fc7fda21b6967920adfc16a06d9094aa2759"
+    },
+    {
+      "policy_hash": "d69b2472d3a144e3ffa3da40bcc594b9384e67a26f141a86ce0ba8909e670ab9",
+      "verified_reward": 37.895,
+      "agent_id": "agent_agent_002_1767123079896",
+      "timestamp": "2025-12-31T01:11:34.767229",
+      "previous_hash": "cfa06520fd3be018dc9f5eab1b16fc7fda21b6967920adfc16a06d9094aa2759",
+      "current_hash": "6d704308fe0ec1eb25442073d6f200265d63989644a41d3f08312a1ce3fe5a67"
+    },
+    {
+      "policy_hash": "42673dfc665f823b383e4160b7b63a33f7b41db1e552d22f10f740606b98e992",
+      "verified_reward": -13.6,
+      "agent_id": "agent_001",
+      "timestamp": "2025-12-31T11:49:13.403915",
+      "previous_hash": "6d704308fe0ec1eb25442073d6f200265d63989644a41d3f08312a1ce3fe5a67",
+      "current_hash": "8f0d580006e0c1aa0b3f16d8beba34ecbf7d5fd3435fb74d596c11007989ab1d"
+    },
+    {
+      "policy_hash": "f0af58488f1bff3ade38f790ebf9f29a2db015832b8246e64ea57036a015dbea",
+      "verified_reward": 39.814,
+      "agent_id": "5084",
+      "timestamp": "2025-12-31T12:03:25.853295",
+      "previous_hash": "8f0d580006e0c1aa0b3f16d8beba34ecbf7d5fd3435fb74d596c11007989ab1d",
+      "current_hash": "c76da34659abcb2a5fa180c8e7ce97dc26f8ccae293b41bc7406a2d36ea13172"
+    },
+    {
+      "policy_hash": "995902d5009ca5b8ab2a98d51d579f9c34d87ef16399104ee5f7b42f650ee54a",
+      "verified_reward": 38.467,
+      "agent_id": "3450",
+      "timestamp": "2025-12-31T12:59:21.824178",
+      "previous_hash": "c76da34659abcb2a5fa180c8e7ce97dc26f8ccae293b41bc7406a2d36ea13172",
+      "current_hash": "1e04c0da683be8007d16584457821e8f44be52c58725cc429ef3529b4fd0f727"
+    },
+    {
+      "policy_hash": "d0f7eadab70d7fcccd9ea1d67770dc50014a2c3d148f98ae4fd383e0b737fd90",
+      "verified_reward": 24.375,
+      "agent_id": "5794",
+      "timestamp": "2025-12-31T14:31:06.016365",
+      "previous_hash": "1e04c0da683be8007d16584457821e8f44be52c58725cc429ef3529b4fd0f727",
+      "current_hash": "5b6657079bb18cb75b0ddb26ed0250eb847a65fcbeafbb7872cb87c1e0149d3c"
+    },
+    {
+      "policy_hash": "88d9b39583d71149cd4a9c6d82a9bd46a9fa4da0c7dff68b7544a0eb8002549a",
+      "verified_reward": 71.434,
+      "agent_id": "agent_live_1767171685054",
+      "timestamp": "2025-12-31T14:31:37.968833",
+      "previous_hash": "5b6657079bb18cb75b0ddb26ed0250eb847a65fcbeafbb7872cb87c1e0149d3c",
+      "current_hash": "e33760fcb72b1c88ef7ef1afe18fa902281506300986070bc75316f69136ea29"
     }
   ]
 }

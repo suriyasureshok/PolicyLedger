@@ -340,15 +340,22 @@ class LiveTrainingManager:
     
     def get_all_sessions(self) -> Dict[str, Dict]:
         """Get summary of all active sessions"""
-        return {
-            agent_id: {
+        sessions = {}
+        for agent_id, state in self.sessions.items():
+            # Calculate current average reward
+            avg_reward = 0.0
+            if state.metrics_history:
+                avg_reward = state.metrics_history[-1].avg_reward
+            
+            sessions[agent_id] = {
                 "status": state.status,
                 "episode": state.episode,
                 "total_episodes": state.total_episodes,
-                "running_time": time.time() - state.start_time
+                "running_time": time.time() - state.start_time,
+                "claimed_reward": avg_reward,
+                "policy_hash": getattr(state, 'final_policy_hash', None)
             }
-            for agent_id, state in self.sessions.items()
-        }
+        return sessions
     
     def cleanup_session(self, agent_id: str):
         """Remove a completed session"""

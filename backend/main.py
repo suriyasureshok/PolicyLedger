@@ -21,6 +21,11 @@ from datetime import datetime
 from pathlib import Path
 import asyncio
 import ast
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from src.agent.runner import run_agent, PolicyClaim
 from src.verifier.verifier import PolicyVerifier
@@ -58,7 +63,7 @@ app.add_middleware(
 LEDGER_FILE = "ledger.json"
 ledger = PolicyLedger(LEDGER_FILE)
 verifier = PolicyVerifier()
-explainer = Explainer(use_gemini=True)  # Initialize with Gemini support
+explainer = Explainer(use_gemini=False)  # Use fallback explainer only
 
 # Training state
 training_jobs = {}
@@ -1024,13 +1029,12 @@ async def get_policy_explanation(agent_id: str):
         # Calculate baseline for comparison
         avg_reward = sum(e.verified_reward for e in entries) / len(entries) if entries else 0
         
-        # Create explanation metrics
+        # Create explanation metrics (NamedTuple - use positional args in correct order)
         metrics = ExplanationMetrics(
-            agent_id=agent_id,
-            policy_hash=entry.policy_hash,
+            environment_name="Cyber Defense Environment",
+            policy_identifier=entry.policy_hash,
             verified_reward=entry.verified_reward,
             baseline_reward=avg_reward,
-            environment_name="Cyber Defense Environment",
             behavior_stats=behavior_stats
         )
         
