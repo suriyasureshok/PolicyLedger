@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Ledger entries are append-only and publicly readable
+    match /ledger_entries/{entryId} {
+      // Anyone can read ledger entries
+      allow read: if true;
+      
+      // Only authenticated services can write
+      allow create: if request.auth != null;
+      
+      // No updates or deletes (immutable ledger)
+      allow update, delete: if false;
+      
+      // Validate entry structure on create
+      allow create: if request.resource.data.keys().hasAll([
+        'policy_hash', 
+        'agent_id', 
+        'verified_reward', 
+        'timestamp', 
+        'previous_hash', 
+        'current_hash'
+      ]);
+    }
+    
+    // Policy data (Q-tables)
+    match /policies/{policyHash} {
+      // Anyone can read policies
+      allow read: if true;
+      
+      // Only authenticated services can write
+      allow create, update: if request.auth != null;
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // Verification jobs
+    match /verification_jobs/{jobId} {
+      // Anyone can read verification status
+      allow read: if true;
+      
+      // Only authenticated services can write
+      allow create, update: if request.auth != null;
+      
+      // Jobs can be deleted by authenticated services (cleanup)
+      allow delete: if request.auth != null;
+    }
+    
+    // Marketplace data (cached rankings)
+    match /marketplace/{docId} {
+      // Anyone can read marketplace rankings
+      allow read: if true;
+      
+      // Only authenticated services can update rankings
+      allow write: if request.auth != null;
+    }
+    
+    // Agent metadata
+    match /agents/{agentId} {
+      // Anyone can read agent info
+      allow read: if true;
+      
+      // Only authenticated services can write
+      allow write: if request.auth != null;
+    }
+  }
+}
