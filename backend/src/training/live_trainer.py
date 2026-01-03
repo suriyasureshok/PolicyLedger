@@ -268,7 +268,8 @@ class LiveTrainingManager:
                     policy_hash = hash_policy(policy_bytes)
                     
                     # Save policy to disk as JSON
-                    policy_dir = Path("policies")
+                    backend_dir = Path(__file__).parent.parent.parent
+                    policy_dir = backend_dir / "policies"
                     policy_dir.mkdir(exist_ok=True)
                     policy_path = policy_dir / f"{policy_hash}.json"
                     
@@ -278,20 +279,75 @@ class LiveTrainingManager:
                         for state, action in policy.items()
                     }
                     
-                    # Calculate average reward for metadata
+                    # === DETERMINISTIC EVALUATION ===
+                    # Run policy without exploration to get true performance
+                    # This must match what the verifier will do
+                    print(f"   Running deterministic evaluation (20 episodes)...")
+                    
+                    # Run multiple episodes to average out randomness
+                    num_eval_episodes = 20
+                    episode_rewards = []
+                    
+                    for eval_ep in range(num_eval_episodes):
+                        # Re-create environment with same seed as used in verification
+                        eval_env = CyberDefenseEnv(
+                            time_horizon=state.env.time_horizon,
+                            seed=state.seed
+                        )
+                        
+                        episode_reward = 0.0
+                        obs = eval_env.reset()
+                        current_state = discretize_state(obs)
+                        
+                        steps = 0
+                        max_steps = state.env.time_horizon * 2
+                        
+                        while not eval_env.done and steps < max_steps:
+                            # Use policy deterministically (no exploration)
+                            if current_state not in policy:
+                                # Default to IGNORE if state not seen
+                                action = 0
+                            else:
+                                action = policy[current_state]
+                            
+                            # Handle both 3-value and 4-value returns from step()
+                            step_result = eval_env.step(action)
+                            if len(step_result) == 4:
+                                obs, reward, done, _ = step_result
+                            else:
+                                obs, reward, done = step_result
+                            
+                            episode_reward += reward
+                            steps += 1
+                            
+                            if done:
+                                break
+                            
+                            current_state = discretize_state(obs)
+                        
+                        episode_rewards.append(episode_reward)
+                    
+                    # Average reward across all evaluation episodes
+                    deterministic_reward = sum(episode_rewards) / len(episode_rewards)
+                    
+                    # Also calculate training average for comparison
                     if state.metrics_history:
                         recent_rewards = [m.reward for m in state.metrics_history[-100:]]
-                        avg_reward = sum(recent_rewards) / len(recent_rewards)
+                        training_avg = sum(recent_rewards) / len(recent_rewards)
                     else:
-                        avg_reward = 0.0
+                        training_avg = 0.0
+                    
+                    print(f"   Training avg (with exploration): {training_avg:.2f}")
+                    print(f"   Deterministic evaluation: {deterministic_reward:.2f}")
                     
                     # Create artifact with proper structure
                     artifact = {
                         "policy": serializable_policy,
                         "metadata": {
                             "agent_id": state.agent_id,
-                            "claimed_reward": avg_reward,
-                            "policy_hash": policy_hash
+                            "claimed_reward": deterministic_reward,
+                            "policy_hash": policy_hash,
+                            "training_avg_reward": training_avg
                         }
                     }
                     
@@ -300,9 +356,9 @@ class LiveTrainingManager:
                     
                     # Store for potential ledger addition
                     state.final_policy_hash = policy_hash
-                    state.final_reward = avg_reward
+                    state.final_reward = deterministic_reward
                     
-                    print(f"✓ Policy saved: {policy_hash[:16]}... (reward: {avg_reward:.2f})")
+                    print(f"✓ Policy saved: {policy_hash[:16]}... (claimed reward: {deterministic_reward:.2f})")
                     
                 except Exception as e:
                     print(f"Error saving policy: {e}")

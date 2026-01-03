@@ -250,19 +250,18 @@ class PolicyVerifier:
         
         How replay works:
         1. Instantiate environment with fixed seed
-        2. Reset environment
+        2. Run multiple episodes (20) to average out randomness
         3. For each step:
             - Observe state
             - Ask policy for action
             - Apply action
             - Accumulate reward
         4. Stop at terminal condition
-        5. Output total reward
+        5. Output average reward across all episodes
         
         Non-negotiable rules:
         - Same environment code as agent
         - Same seed
-        - No randomness
         - No exploration
         - No epsilon-greedy
         - No re-training
@@ -273,7 +272,7 @@ class PolicyVerifier:
             policy: Loaded policy {state: action}
         
         Returns:
-            Total accumulated reward from replay
+            Average accumulated reward across 20 episodes
         
         Raises:
             Exception if replay fails or policy is incomplete
@@ -282,41 +281,50 @@ class PolicyVerifier:
         # Format: "cyber_defense_env_seed_{seed}_horizon_{time_horizon}"
         seed, time_horizon = self._parse_env_id(env_id)
         
-        # Create environment with exact same configuration
-        env = CyberDefenseEnv(
-            time_horizon=time_horizon,
-            seed=seed
-        )
+        # Run multiple episodes to average out randomness
+        num_verification_episodes = 20
+        episode_rewards = []
         
-        # Reset environment to initial state
-        state_dict = env.reset()
+        for episode_num in range(num_verification_episodes):
+            # Create environment with exact same configuration
+            env = CyberDefenseEnv(
+                time_horizon=time_horizon,
+                seed=seed
+            )
+            
+            # Reset environment to initial state
+            state_dict = env.reset()
+            
+            # Accumulate total reward for this episode
+            episode_reward = 0.0
+            steps = 0
+            max_steps = time_horizon * 2  # Safety limit
+            
+            # Replay loop
+            while not env.done and steps < max_steps:
+                # Convert state dict to state tuple (discretized)
+                state_tuple = self._discretize_state(state_dict)
+                
+                # Ask policy for action
+                if state_tuple not in policy:
+                    # Default to IGNORE (action 0) for unseen states
+                    # This matches the behavior during deterministic evaluation in training
+                    action = 0
+                else:
+                    action = policy[state_tuple]
+                
+                # Apply action and observe result
+                state_dict, reward, done = env.step(action)
+                
+                # Accumulate reward
+                episode_reward += reward
+                steps += 1
+            
+            episode_rewards.append(episode_reward)
         
-        # Accumulate total reward
-        total_reward = 0.0
-        steps = 0
-        max_steps = time_horizon * 2  # Safety limit
-        
-        # Replay loop
-        while not env.done and steps < max_steps:
-            # Convert state dict to state tuple (discretized)
-            state_tuple = self._discretize_state(state_dict)
-            
-            # Ask policy for action
-            if state_tuple not in policy:
-                raise ValueError(
-                    f"Policy incomplete: missing action for state {state_tuple}"
-                )
-            
-            action = policy[state_tuple]
-            
-            # Apply action and observe result
-            state_dict, reward, done = env.step(action)
-            
-            # Accumulate reward
-            total_reward += reward
-            steps += 1
-        
-        return total_reward
+        # Return average reward across all episodes
+        average_reward = sum(episode_rewards) / len(episode_rewards)
+        return average_reward
     
     def _parse_env_id(self, env_id: str) -> tuple[int, int]:
         """

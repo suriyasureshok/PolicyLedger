@@ -211,7 +211,9 @@ def _save_policy_artifact(policy_hash: str, policy: Policy, reward: float, agent
         reward: Claimed reward
         agent_id: Agent ID
     """
-    policies_dir = Path("policies")
+    from pathlib import Path as PathlibPath
+    backend_dir = PathlibPath(__file__).parent.parent.parent
+    policies_dir = backend_dir / "policies"
     policies_dir.mkdir(exist_ok=True)
 
     # Convert policy to serializable format

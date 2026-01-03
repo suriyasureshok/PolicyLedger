@@ -532,19 +532,6 @@ PolicyLedger demonstrates:
 
 ---
 
-## 🤝 Contributing
-
-Contributions welcome! Areas for improvement:
-
-- Additional RL environments
-- Advanced verification techniques
-- Distributed verifier network
-- Byzantine fault tolerance
-- Privacy-preserving verification
-- Multi-agent collaboration
-
----
-
 ## 📄 License
 
 This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
@@ -559,4 +546,4 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 ---
 
-**Built for HackNEXA 2025** ❤️
+**Built for HackNEXA 2026** ❤️

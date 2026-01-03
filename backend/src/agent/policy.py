@@ -59,8 +59,13 @@ def extract_policy(q_table: Dict[Tuple[State, Action], float]) -> Policy:
     # For each state, find action with max Q-value
     for state in states:
         # Get Q-values for all actions in this state
-        actions = [0, 1]  # SAVE, USE
-        q_values = [(action, q_table.get((state, action), 0.0)) for action in actions]
+        # Determine number of actions from Q-table
+        available_actions = set(action for (s, action) in q_table.keys() if s == state)
+        if not available_actions:
+            # Fallback to common action space (cyber defense: 0-4)
+            available_actions = [0, 1, 2, 3, 4]
+        
+        q_values = [(action, q_table.get((state, action), 0.0)) for action in available_actions]
 
         # Pick action with highest Q-value (deterministic)
         best_action = max(q_values, key=lambda x: x[1])[0]

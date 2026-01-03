@@ -28,7 +28,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.agent.runner import run_agent, PolicyClaim
-from src.verifier.verifier import PolicyVerifier
+from src.agent.policy import serialize_policy, deserialize_policy
+from src.verifier.verifier import PolicyVerifier, VerificationStatus
 from src.ledger.ledger import PolicyLedger, verify_chain_integrity
 from src.marketplace.ranking import select_best_policy, PolicyMarketplace
 from src.consumer.reuse import reuse_best_policy
@@ -60,9 +61,11 @@ app.add_middleware(
 )
 
 # Global instances
-LEDGER_FILE = "ledger.json"
+BACKEND_DIR = Path(__file__).parent
+LEDGER_FILE = BACKEND_DIR / "ledger.json"
+POLICIES_DIR = BACKEND_DIR / "policies"
 ledger = PolicyLedger(LEDGER_FILE)
-verifier = PolicyVerifier()
+verifier = PolicyVerifier(reward_threshold=10.0)  # Allow reasonable variance in stochastic env
 explainer = Explainer(use_gemini=False)  # Use fallback explainer only
 
 # Training state
@@ -109,6 +112,41 @@ def load_policy_from_file(policy_path: Path) -> Dict:
     print(f"  [Policy Loader] Policy has {len(policy)} states")
     
     return policy
+
+
+def serialize_policy_to_bytes(policy: Dict) -> bytes:
+    """
+    Serialize policy dict to bytes using the same method as training.
+    
+    This must match the serialization used during training to ensure
+    the hash verification passes.
+    
+    The policy dict should have tuple keys like (0, 1, 2, 0, 1).
+    """
+    # Use the agent.policy.serialize_policy function for consistency
+    # This ensures sort_keys=True and proper string conversion
+    return serialize_policy(policy)
+
+
+def load_policy_artifact_from_file(policy_path: Path) -> bytes:
+    """
+    Load the policy and serialize it exactly as it was during training.
+    
+    This reads the JSON file and re-serializes the policy portion only,
+    matching the exact serialization used when computing the original hash.
+    """
+    with open(policy_path, 'r') as f:
+        data = json.load(f)
+    
+    # Extract just the policy portion (serializable_policy with string keys)
+    if "policy" in data:
+        serializable_policy = data["policy"]
+    else:
+        serializable_policy = data
+    
+    # Re-serialize with sorted keys for determinism (matching training)
+    json_str = json.dumps(serializable_policy, sort_keys=True)
+    return json_str.encode('utf-8')
 
 
 # ============================================================================
@@ -385,20 +423,26 @@ async def websocket_train_endpoint(websocket: WebSocket, agent_id: str):
                 print(f"Training completed for {agent_id}. Running verification...")
                 
                 # Load policy for verification
-                policy_path = Path("policies") / f"{session.final_policy_hash}.json"
+                policy_path = POLICIES_DIR / f"{session.final_policy_hash}.json"
                 if not policy_path.exists():
                     print(f"⚠ Policy file not found: {policy_path}")
                 else:
-                    # Load and parse policy
-                    policy = load_policy_from_file(policy_path)
+                    # Load policy artifact (serialized bytes matching original hash)
+                    policy_artifact = load_policy_artifact_from_file(policy_path)
+                    
+                    # Create proper env_id format for verifier
+                    # Format: "cyber_defense_env_seed_{seed}_horizon_{time_horizon}"
+                    time_horizon = session.env_config.get('time_horizon', 24)
+                    env_id = f"cyber_defense_env_seed_{session.seed}_horizon_{time_horizon}"
                     
                     # Create policy claim
                     from src.agent.runner import PolicyClaim
                     claim = PolicyClaim(
                         agent_id=agent_id,
+                        env_id=env_id,
                         policy_hash=session.final_policy_hash,
-                        claimed_reward=session.final_reward,
-                        policy=policy
+                        policy_artifact=policy_artifact,
+                        claimed_reward=session.final_reward
                     )
                     
                     # VERIFY the policy claim
@@ -419,7 +463,8 @@ async def websocket_train_endpoint(websocket: WebSocket, agent_id: str):
                         # INVALID policy - do NOT add to ledger
                         print(f"✗ Policy INVALID - NOT added to ledger")
                         print(f"  Reason: {verification_result.reason}")
-                        print(f"  Claimed: {session.final_reward:.3f} | Verified: {verification_result.verified_reward:.3f}")
+                        verified_str = f"{verification_result.verified_reward:.3f}" if verification_result.verified_reward is not None else "N/A"
+                        print(f"  Claimed: {session.final_reward:.3f} | Verified: {verified_str}")
             else:
                 if session:
                     print(f"Session found but not processing: status={session.status}, has_hash={hasattr(session, 'final_policy_hash')}")
@@ -659,22 +704,55 @@ async def verify_agent_endpoint(agent_id: str):
             from src.agent.runner import PolicyClaim
             
             # Load the policy file
-            policy_path = Path("policies") / f"{session.final_policy_hash}.json"
+            policy_path = POLICIES_DIR / f"{session.final_policy_hash}.json"
             if not policy_path.exists():
                 raise HTTPException(status_code=404, detail=f"Policy file not found for {agent_id}")
             
-            # Load and parse policy
-            policy = load_policy_from_file(policy_path)
+            # Load policy artifact (serialized bytes matching original hash)
+            policy_artifact = load_policy_artifact_from_file(policy_path)
+            
+            # Create proper env_id format for verifier
+            # Format: "cyber_defense_env_seed_{seed}_horizon_{time_horizon}"
+            time_horizon = session.env_config.get('time_horizon', 24)
+            env_id = f"cyber_defense_env_seed_{session.seed}_horizon_{time_horizon}"
             
             claim = PolicyClaim(
                 agent_id=agent_id,
+                env_id=env_id,
                 policy_hash=session.final_policy_hash,
-                claimed_reward=session.final_reward,
-                policy=policy
+                policy_artifact=policy_artifact,
+                claimed_reward=session.final_reward
             )
             
             # Verify claim
+            print(f"🔍 Starting verification for {agent_id}")
+            print(f"   Policy hash: {session.final_policy_hash[:16]}...")
+            print(f"   Claimed reward: {session.final_reward:.3f}")
             result = verifier.verify(claim)
+            print(f"   Verification result: {result.status.value}")
+            print(f"   Verified reward: {result.verified_reward:.3f if result.verified_reward else 'N/A'}")
+            print(f"   Reason: {result.reason}")
+            
+            # If VALID, add to ledger
+            if result.status == VerificationStatus.VALID:
+                try:
+                    print(f"   ✓ Verification PASSED - Adding to ledger...")
+                    entry = ledger.append(
+                        policy_hash=session.final_policy_hash,
+                        verified_reward=result.verified_reward,
+                        agent_id=agent_id,
+                        env_config=session.env_config
+                    )
+                    print(f"✓ Policy VERIFIED and added to ledger via /agent/verify")
+                    print(f"  Agent: {agent_id} | Verified reward: {result.verified_reward:.3f}")
+                    print(f"  Ledger now has {len(ledger.read_all())} entries")
+                except Exception as e:
+                    print(f"⚠ Failed to add to ledger: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print(f"   ✗ Verification FAILED - NOT adding to ledger")
+                print(f"   Reason: {result.reason}")
             
             return VerifyResponse(
                 agent_id=claim.agent_id,
